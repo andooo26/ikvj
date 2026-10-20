@@ -1,0 +1,44 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>gen</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+</style>
+<canvas id="c"></canvas>
+<script>
+  // Stand-in for the generative sketch: cheap, but busy enough to show tearing,
+  // dropped frames and orientation (the TOP-LEFT marker must stay top-left).
+  const q = new URLSearchParams(location.search);
+  const name = q.get('name') ?? '?';
+  const hue = Number(q.get('hue') ?? 200);
+  const c = document.getElementById('c');
+  const ctx = c.getContext('2d');
+  let frame = 0;
+  function draw(t) {
+    if (c.width !== innerWidth || c.height !== innerHeight) {
+      c.width = innerWidth;
+      c.height = innerHeight;
+    }
+    const w = c.width, h = c.height;
+    ctx.fillStyle = `hsl(${hue} 60% 12%)`;
+    ctx.fillRect(0, 0, w, h);
+    for (let i = 0; i < 12; i++) {
+      const x = ((t / 8 + i * w / 12) % (w + 200)) - 100;
+      ctx.fillStyle = `hsl(${hue + i * 12} 80% ${40 + (i % 3) * 10}%)`;
+      ctx.fillRect(x, h * (i / 12), 160, h / 12);
+    }
+    const bx = (t / 4) % w;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(bx, 0, 8, h);
+    ctx.fillStyle = '#f00';
+    ctx.fillRect(0, 0, 220, 120);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 40px system-ui, sans-serif';
+    ctx.fillText('TOP-LEFT', 16, 74);
+    ctx.font = 'bold 120px system-ui, sans-serif';
+    ctx.fillText(`${name}  ${frame++}`, w * 0.3, h * 0.55);
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+</script>

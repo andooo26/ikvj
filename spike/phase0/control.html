@@ -1,0 +1,61 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>ikvj phase0</title>
+<style>
+  :root { color-scheme: dark; font: 13px system-ui, sans-serif; }
+  body { margin: 16px; background: #111; color: #ddd; }
+  canvas { width: 100%; aspect-ratio: 16 / 9; background: #000; display: block; }
+  .row { display: flex; gap: 12px; align-items: center; margin: 8px 0; }
+  .row label { width: 24px; font-weight: bold; }
+  input[type=range] { flex: 1; }
+  pre { background: #000; padding: 8px; white-space: pre-wrap; font-size: 12px; }
+</style>
+<h3>MIX preview (sharedTexture, zero-copy)</h3>
+<canvas id="preview" width="960" height="540"></canvas>
+<div id="faders"></div>
+<div class="row">
+  <button id="reverse">Reverse layer order</button>
+  <span id="order"></span>
+</div>
+<pre id="stats">waiting…</pre>
+<script>
+  const { ipcRenderer, sharedTexture } = require('electron');
+  const names = new URLSearchParams(location.search).get('sources') ?? 'ABCD';
+  const slotOf = { A: 0, B: 1, C: 2, D: 3 };
+
+  const faders = document.getElementById('faders');
+  for (const n of names) {
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.innerHTML = `<label>${n}</label><input type="range" min="0" max="1" step="0.01" value="${n === 'A' ? 1 : 0}">`;
+    row.querySelector('input').addEventListener('input', (e) => {
+      ipcRenderer.send('opacity', slotOf[n], Number(e.target.value));
+    });
+    faders.appendChild(row);
+  }
+
+  let order = [0, 1, 2, 3];
+  const showOrder = () => {
+    document.getElementById('order').textContent =
+      'bottom → top: ' + order.map((s) => 'ABCD'[s]).join(' → ');
+  };
+  showOrder();
+  document.getElementById('reverse').addEventListener('click', () => {
+    order = [...order].reverse();
+    ipcRenderer.send('order', order);
+    showOrder();
+  });
+
+  const canvas = document.getElementById('preview');
+  const ctx = canvas.getContext('2d');
+  sharedTexture.setSharedTextureReceiver(async ({ importedSharedTexture }) => {
+    const frame = importedSharedTexture.getVideoFrame();
+    ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
+    frame.close();
+    importedSharedTexture.release();
+  });
+
+  ipcRenderer.on('stats', (_e, s) => {
+    document.getElementById('stats').textContent = JSON.stringify(s, null, 2);
+  });
+</script>
