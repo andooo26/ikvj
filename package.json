@@ -2,17 +2,37 @@
   "name": "ikvj",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "description": "YouTube x2 + generative x2 VJ source mixer with Syphon (macOS) / Spout (Windows) output",
   "author": "andooo26",
   "license": "MIT",
-  "devDependencies": {
-    "electron": "^44.9.1",
-    "node-addon-api": "^8.9.2",
-    "node-gyp": "^13.1.0"
-  },
+  "main": "out/main/index.js",
   "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
     "build:native": "node-gyp rebuild --directory native",
-    "test:native": "node native/test/selftest.js",
-    "phase0": "electron spike/phase0/main.js"
+    "test:native": "node native/test/selftest.cjs",
+    "phase0": "electron spike/phase0/main.cjs"
+  },
+  "dependencies": {
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "electron": "^44.9.1",
+    "electron-vite": "^6.0.0",
+    "node-addon-api": "^8.9.2",
+    "node-gyp": "^13.1.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.5"
   }
 }

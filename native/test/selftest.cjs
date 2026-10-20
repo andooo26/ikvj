@@ -1,6 +1,6 @@
 // Plain-Node self-test for the native engine: compositing math, layer order,
 // sender lifecycle. Runs without Electron (and on GPU-less CI via WARP on
-// Windows). Usage: node native/test/selftest.js
+// Windows). Usage: node native/test/selftest.cjs
 'use strict';
 
 const assert = require('node:assert/strict');
