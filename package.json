@@ -1,0 +1,18 @@
+{
+  "name": "ikvj",
+  "version": "0.0.0",
+  "private": true,
+  "description": "YouTube x2 + generative x2 VJ source mixer with Syphon (macOS) / Spout (Windows) output",
+  "author": "andooo26",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^44.9.1",
+    "node-addon-api": "^8.9.2",
+    "node-gyp": "^13.1.0"
+  },
+  "scripts": {
+    "build:native": "node-gyp rebuild --directory native",
+    "test:native": "node native/test/selftest.js",
+    "phase0": "electron spike/phase0/main.js"
+  }
+}
