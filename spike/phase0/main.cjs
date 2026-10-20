@@ -49,6 +49,15 @@ const PLAYER_ONLY_CSS = `
   }`;
 
 let engine;
+const timers = [];
+const pending = new Map(); // setSource token -> paint texture still read by the GPU
+
+function releaseCompleted() {
+  for (const token of engine.completed()) {
+    pending.get(token)?.release();
+    pending.delete(token);
+  }
+}
 let control;
 const senders = new Map(); // target -> sender id
 const stats = { paints: {}, setSourceMs: {}, errors: {}, composeMs: 0, composes: 0 };
@@ -88,16 +97,17 @@ function createSource(src) {
   wc.on('paint', (event) => {
     const tex = event.texture;
     if (!tex) return;
+    releaseCompleted();
     try {
       const info = tex.textureInfo;
       const handle = info.handle.ioSurface ?? info.handle.ntHandle;
       const t0 = performance.now();
-      engine.setSource(src.slot, handle, info.pixelFormat);
+      // Non-blocking: the texture is released once the GPU reports it done.
+      pending.set(engine.setSource(src.slot, handle, info.pixelFormat), tex);
       stats.setSourceMs[src.name] += performance.now() - t0;
       stats.paints[src.name]++;
     } catch (err) {
       stats.errors[src.name] = String(err.message ?? err);
-    } finally {
       tex.release();
     }
   });
@@ -117,6 +127,7 @@ function createSource(src) {
 }
 
 function mixTick() {
+  releaseCompleted();
   const t0 = performance.now();
   const layers = order
     .filter((slot) => SOURCES.some((s) => s.slot === slot))
@@ -216,9 +227,9 @@ app.whenReady().then(() => {
 
   for (const s of SOURCES) createSource(s);
 
-  setInterval(mixTick, 1000 / FPS);
-  setInterval(sendPreview, 1000 / 30);
-  setInterval(report, 1000);
+  timers.push(setInterval(mixTick, 1000 / FPS));
+  timers.push(setInterval(sendPreview, 1000 / 30));
+  timers.push(setInterval(report, 1000));
   if (SECONDS) {
     setTimeout(async () => {
       if (args.snapshot) {
@@ -238,6 +249,10 @@ ipcMain.on('order', (_e, next) => {
 });
 
 app.on('will-quit', () => {
+  for (const t of timers) clearInterval(t);
+  engine?.drain();
+  for (const tex of pending.values()) tex.release();
+  pending.clear();
   for (const id of senders.values()) engine?.destroySender(id);
   engine?.dispose();
 });

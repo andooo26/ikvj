@@ -3,7 +3,8 @@
 //
 //   const { Engine, MIX, listServers } = require('ikvj_native.node')
 //   const e = new Engine(1920, 1080)
-//   e.setSource(slot, handleBuffer, 'bgra')   // from a paint event's texture
+//   const token = e.setSource(slot, handleBuffer, 'bgra')  // paint texture
+//   e.completed()  // tokens whose texture the GPU is done with -> release()
 //   e.compose([{ slot: 0, opacity: 1 }, ...]) // bottom layer first
 //   const id = e.createSender('ikvj-MIX'); e.publish(id, MIX)
 
@@ -22,6 +23,8 @@ class EngineWrap : public Napi::ObjectWrap<EngineWrap> {
             InstanceAccessor<&EngineWrap::Backend>("backend"),
             InstanceAccessor<&EngineWrap::Adapter>("adapter"),
             InstanceMethod<&EngineWrap::SetSource>("setSource"),
+            InstanceMethod<&EngineWrap::Completed>("completed"),
+            InstanceMethod<&EngineWrap::Drain>("drain"),
             InstanceMethod<&EngineWrap::FillSource>("fillSource"),
             InstanceMethod<&EngineWrap::Compose>("compose"),
             InstanceMethod<&EngineWrap::CreateSender>("createSender"),
@@ -74,7 +77,7 @@ class EngineWrap : public Napi::ObjectWrap<EngineWrap> {
     return Napi::String::New(info.Env(), Get(info.Env()).Adapter());
   }
 
-  void SetSource(const Napi::CallbackInfo& info) {
+  Napi::Value SetSource(const Napi::CallbackInfo& info) {
     const char* usage = "setSource(slot, handle: Buffer, pixelFormat: 'bgra' | 'rgba')";
     int slot = Int(info, 0, usage);
     if (info.Length() < 3 || !info[1].IsBuffer() || !info[2].IsString()) {
@@ -86,13 +89,24 @@ class EngineWrap : public Napi::ObjectWrap<EngineWrap> {
       throw Napi::Error::New(info.Env(), "setSource: unsupported pixel format " + fmt);
     }
     std::string error;
+    uint32_t token = 0;
     Check(info.Env(),
           Get(info.Env()).SetSource(slot, handle.Data(), handle.Length(),
                                     fmt == "rgba" ? ikvj::PixelFormat::kRGBA
                                                   : ikvj::PixelFormat::kBGRA,
-                                    &error),
+                                    &token, &error),
           error);
+    return Napi::Number::New(info.Env(), token);
   }
+
+  Napi::Value Completed(const Napi::CallbackInfo& info) {
+    auto tokens = Get(info.Env()).TakeCompleted();
+    auto out = Napi::Array::New(info.Env(), tokens.size());
+    for (uint32_t i = 0; i < tokens.size(); ++i) out[i] = Napi::Number::New(info.Env(), tokens[i]);
+    return out;
+  }
+
+  void Drain(const Napi::CallbackInfo& info) { Get(info.Env()).Drain(); }
 
   void FillSource(const Napi::CallbackInfo& info) {
     const char* usage = "fillSource(slot, r, g, b)  // 0..1";

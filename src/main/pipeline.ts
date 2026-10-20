@@ -2,7 +2,7 @@
 // Nothing here is driven by commands: on every state change the pipeline
 // reconciles its native resources with what the state says should exist.
 
-import type { OffscreenSharedTexture } from 'electron';
+import type { TextureInfo } from 'electron';
 import {
   OUTPUT_NAMES,
   RESOLUTIONS,
@@ -27,6 +27,8 @@ export class Pipeline {
   private statsTimer: NodeJS.Timeout | null = null;
   private sourceFrames = zeroCounts();
   private mixFrames = 0;
+  /** setSource token -> callback once the GPU no longer reads that texture. */
+  private readonly pending = new Map<number, () => void>();
   private error: string | null = null;
   private readonly unsubscribe: () => void;
 
@@ -48,19 +50,41 @@ export class Pipeline {
     this.destroyEngine();
   }
 
-  /** Feed one offscreen paint into a source slot. Always releases the texture. */
-  submitFrame(source: SourceId, texture: OffscreenSharedTexture): void {
+  /**
+   * Draw one offscreen paint into a source slot. Returns at once; `done` is
+   * called when the GPU has finished reading the texture (or right away if it
+   * was not used), and only then may the caller release it.
+   */
+  submitFrame(source: SourceId, info: TextureInfo, done: () => void): void {
+    this.releaseCompleted();
+    const handle = info.handle.ioSurface ?? info.handle.ntHandle;
+    if (!this.engine || !handle || info.pixelFormat === 'rgbaf16') {
+      done();
+      return;
+    }
     try {
-      if (!this.engine) return;
-      const info = texture.textureInfo;
-      const handle = info.handle.ioSurface ?? info.handle.ntHandle;
-      if (!handle || info.pixelFormat === 'rgbaf16') return;
-      this.engine.setSource(SLOT[source], handle, info.pixelFormat);
+      this.pending.set(this.engine.setSource(SLOT[source], handle, info.pixelFormat), done);
       this.sourceFrames[source]++;
     } catch (err) {
       this.error = String(err instanceof Error ? err.message : err);
-    } finally {
-      texture.release();
+      done();
+    }
+  }
+
+  /** Show black in a slot (no source, or a page that must not be output). */
+  clearSource(source: SourceId): void {
+    try {
+      this.engine?.fillSource(SLOT[source], 0, 0, 0);
+    } catch (err) {
+      this.error = String(err instanceof Error ? err.message : err);
+    }
+  }
+
+  private releaseCompleted(): void {
+    if (!this.engine) return;
+    for (const token of this.engine.completed()) {
+      this.pending.get(token)?.();
+      this.pending.delete(token);
     }
   }
 
@@ -92,6 +116,10 @@ export class Pipeline {
   private destroyEngine(): void {
     if (this.mixTimer) clearInterval(this.mixTimer);
     this.mixTimer = null;
+    // Nothing may still be reading a source texture once its owner gets it back.
+    this.engine?.drain();
+    for (const done of this.pending.values()) done();
+    this.pending.clear();
     for (const id of this.senders.values()) this.engine?.destroySender(id);
     this.senders.clear();
     this.engine?.dispose();
@@ -121,6 +149,7 @@ export class Pipeline {
     const engine = this.engine;
     const native = this.native;
     if (!engine || !native) return;
+    this.releaseCompleted();
     const { mixer } = this.store.get();
     try {
       engine.compose(mixer.order.map((s) => ({ slot: SLOT[s], opacity: mixer.opacity[s] })));

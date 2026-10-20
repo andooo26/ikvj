@@ -39,10 +39,17 @@ class Engine {
 
   // Draw an Electron shared texture into `slot`, scaled to fit and letterboxed
   // onto black. `handle` is the raw bytes of TextureInfo.handle.ioSurface
-  // (macOS) or .ntHandle (Windows). Blocks until the GPU has finished reading
-  // the texture, so the caller may release it as soon as this returns.
+  // (macOS) or .ntHandle (Windows). Returns immediately; the GPU may still be
+  // reading the texture. `*token` comes back from TakeCompleted() once it is
+  // done, and only then may the caller release the texture to Electron.
   virtual bool SetSource(int slot, const uint8_t* handle, size_t handle_len,
-                         PixelFormat format, std::string* error) = 0;
+                         PixelFormat format, uint32_t* token, std::string* error) = 0;
+
+  // Tokens of SetSource calls whose GPU work has finished since the last call.
+  virtual std::vector<uint32_t> TakeCompleted() = 0;
+
+  // Block until all submitted GPU work is done (before releasing everything).
+  virtual void Drain() = 0;
 
   // Fill a slot with a solid colour (self-test / "no signal").
   virtual bool FillSource(int slot, float r, float g, float b, std::string* error) = 0;

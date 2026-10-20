@@ -13,6 +13,7 @@
 #import <Syphon/Syphon.h>
 
 #include <map>
+#include <mutex>
 
 namespace ikvj {
 namespace {
@@ -62,6 +63,7 @@ class MetalEngine final : public Engine {
   MetalEngine(int width, int height) : Engine(width, height) {}
 
   ~MetalEngine() override {
+    if (queue_) Drain();
     for (auto& [id, server] : senders_) [server stop];
     senders_.clear();
     for (IOSurfaceRef s : surfaces_) {
@@ -133,7 +135,7 @@ class MetalEngine final : public Engine {
   std::string Adapter() const override { return device_.name.UTF8String; }
 
   bool SetSource(int slot, const uint8_t* handle, size_t handle_len, PixelFormat format,
-                 std::string* error) override {
+                 uint32_t* token, std::string* error) override {
     if (!ValidSlot(slot, error)) return false;
     if (handle_len < sizeof(IOSurfaceRef)) {
       SetError(error, @"SetSource: ioSurface handle too short");
@@ -168,10 +170,30 @@ class MetalEngine final : public Engine {
     id<MTLRenderCommandEncoder> enc = BeginPass(cb, slot, /*clear=*/true);
     Draw(enc, src, p);
     [enc endEncoding];
+    uint32_t t = next_token_++;
+    if (next_token_ == 0) next_token_ = 1;
+    // Runs on a Metal thread; JS collects it via TakeCompleted().
+    std::shared_ptr<Completed> done = completed_;
+    [cb addCompletedHandler:^(id<MTLCommandBuffer>) {
+      std::lock_guard<std::mutex> lock(done->mu);
+      done->tokens.push_back(t);
+    }];
     [cb commit];
-    // Electron recycles the texture on release(); it must be fully read first.
-    [cb waitUntilCompleted];
+    *token = t;
     return true;
+  }
+
+  std::vector<uint32_t> TakeCompleted() override {
+    std::lock_guard<std::mutex> lock(completed_->mu);
+    std::vector<uint32_t> out;
+    out.swap(completed_->tokens);
+    return out;
+  }
+
+  void Drain() override {
+    id<MTLCommandBuffer> cb = [queue_ commandBuffer];
+    [cb commit];
+    [cb waitUntilCompleted];  // the queue is serial, so everything before is done
   }
 
   bool FillSource(int slot, float r, float g, float b, std::string* error) override {
@@ -309,6 +331,14 @@ class MetalEngine final : public Engine {
   id<MTLTexture> targets_[kNumTargets];
   std::map<int, SyphonMetalServer*> senders_;
   int next_sender_id_ = 1;
+
+  // Shared with completion handlers, which may outlive a call but not the queue.
+  struct Completed {
+    std::mutex mu;
+    std::vector<uint32_t> tokens;
+  };
+  std::shared_ptr<Completed> completed_ = std::make_shared<Completed>();
+  uint32_t next_token_ = 1;
 };
 
 }  // namespace

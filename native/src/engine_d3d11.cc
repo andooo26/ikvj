@@ -81,6 +81,7 @@ class D3D11Engine final : public Engine {
   D3D11Engine(int width, int height) : Engine(width, height) {}
 
   ~D3D11Engine() override {
+    if (ctx_ && fence_) Drain();
     for (auto& [id, sender] : senders_) {
       sender->ReleaseSender();
       sender->CloseDirectX11();
@@ -197,7 +198,7 @@ class D3D11Engine final : public Engine {
   std::string Adapter() const override { return adapter_name_; }
 
   bool SetSource(int slot, const uint8_t* handle, size_t handle_len, PixelFormat,
-                 std::string* error) override {
+                 uint32_t* token, std::string* error) override {
     if (!ValidSlot(slot, error)) return false;
     if (handle_len < sizeof(HANDLE)) return Fail(error, "SetSource: ntHandle too short");
     HANDLE h;
@@ -222,9 +223,48 @@ class D3D11Engine final : public Engine {
     Clear(slot, 0, 0, 0);
     BindTarget(slot);
     Draw(srv.Get(), p);
-    // Electron recycles the texture on release(); it must be fully read first.
-    WaitIdle();
+
+    // An event query marks the end of this draw; TakeCompleted() polls it.
+    Pending pending;
+    if (!free_queries_.empty()) {
+      pending.query = std::move(free_queries_.back());
+      free_queries_.pop_back();
+    } else {
+      D3D11_QUERY_DESC qd{D3D11_QUERY_EVENT, 0};
+      if (FAILED(hr = device_->CreateQuery(&qd, &pending.query))) {
+        return Fail(error, Hr("CreateQuery", hr));
+      }
+    }
+    ctx_->End(pending.query.Get());
+    ctx_->Flush();
+    pending.source = src;  // keep the opened texture alive until the GPU is done
+    pending.token = next_token_++;
+    if (next_token_ == 0) next_token_ = 1;
+    *token = pending.token;
+    pending_.push_back(std::move(pending));
     return true;
+  }
+
+  std::vector<uint32_t> TakeCompleted() override {
+    std::vector<uint32_t> out;
+    // Queries finish in submission order, so stop at the first one still busy.
+    size_t done = 0;
+    for (; done < pending_.size(); ++done) {
+      if (ctx_->GetData(pending_[done].query.Get(), nullptr, 0,
+                        D3D11_ASYNC_GETDATA_DONOTFLUSH) != S_OK) {
+        break;
+      }
+      out.push_back(pending_[done].token);
+      free_queries_.push_back(std::move(pending_[done].query));
+    }
+    pending_.erase(pending_.begin(), pending_.begin() + done);
+    return out;
+  }
+
+  void Drain() override {
+    WaitIdle();
+    for (Pending& p : pending_) free_queries_.push_back(std::move(p.query));
+    pending_.clear();
   }
 
   bool FillSource(int slot, float r, float g, float b, std::string* error) override {
@@ -405,6 +445,15 @@ class D3D11Engine final : public Engine {
   ComPtr<ID3D11RasterizerState> raster_;
   ComPtr<ID3D11Query> fence_;
   Target targets_[kNumTargets];
+
+  struct Pending {
+    uint32_t token = 0;
+    ComPtr<ID3D11Query> query;
+    ComPtr<ID3D11Texture2D> source;
+  };
+  std::vector<Pending> pending_;
+  std::vector<ComPtr<ID3D11Query>> free_queries_;
+  uint32_t next_token_ = 1;
   std::map<int, spoutDX*> senders_;
   std::string adapter_name_;
   int next_sender_id_ = 1;

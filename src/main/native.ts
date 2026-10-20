@@ -13,7 +13,12 @@ export interface Layer {
 export interface Engine {
   readonly backend: 'metal' | 'd3d11';
   readonly adapter: string;
-  setSource(slot: number, handle: Buffer, pixelFormat: 'bgra' | 'rgba'): void;
+  /** Non-blocking; returns a token that `completed()` reports when done. */
+  setSource(slot: number, handle: Buffer, pixelFormat: 'bgra' | 'rgba'): number;
+  /** Tokens whose texture the GPU has finished reading since the last call. */
+  completed(): number[];
+  /** Wait for all submitted GPU work. */
+  drain(): void;
   fillSource(slot: number, r: number, g: number, b: number): void;
   compose(layers: Layer[]): void;
   createSender(name: string): number;
