@@ -31,4 +31,30 @@ describe('reduce', () => {
     expect(next.outputs).toBe(prev.outputs);
     expect(next.mixer).toBe(prev.mixer);
   });
+
+  it('opens search-bar input as a playable URL', () => {
+    const prev = initialState();
+    const s = reduce(prev, { type: 'youtube/open', source: 'A', input: 'youtu.be/aqz-KE-bpKQ' });
+    expect(s.sources.A.url).toBe('https://www.youtube.com/watch?v=aqz-KE-bpKQ');
+    expect(s.sources.B).toBe(prev.sources.B);
+  });
+
+  it('ignores empty search-bar input', () => {
+    const prev = initialState();
+    expect(reduce(prev, { type: 'youtube/open', source: 'A', input: '  ' })).toBe(prev);
+  });
+
+  it('follows navigation, but returns the same state when nothing changed', () => {
+    const url = 'https://www.youtube.com/watch?v=aqz-KE-bpKQ';
+    const s = reduce(initialState(), { type: 'youtube/navigated', source: 'B', url });
+    expect(s.sources.B.url).toBe(url);
+    expect(reduce(s, { type: 'youtube/navigated', source: 'B', url })).toBe(s);
+  });
+
+  it('sets quality and mute per player', () => {
+    let s = reduce(initialState(), { type: 'youtube/setQuality', source: 'B', quality: 'hd720' });
+    s = reduce(s, { type: 'youtube/setMuted', source: 'B', muted: true });
+    expect(s.sources.B).toMatchObject({ quality: 'hd720', muted: true });
+    expect(s.sources.A).toMatchObject({ quality: 'highest', muted: false });
+  });
 });

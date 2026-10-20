@@ -3,9 +3,11 @@
 // `parseAction` before it reaches the reducer.
 
 import { z } from 'zod';
-import { FRAME_RATES, MAX_BPM, MIN_BPM, RESOLUTIONS, SOURCE_IDS } from './state';
+import { FRAME_RATES, MAX_BPM, MIN_BPM, RESOLUTIONS, SOURCE_IDS, YOUTUBE_SOURCE_IDS } from './state';
+import { QUALITIES } from './youtube';
 
 const sourceId = z.enum(SOURCE_IDS);
+const youtubeId = z.enum(YOUTUBE_SOURCE_IDS);
 const unit = z.number().min(0).max(1);
 
 const ActionSchema = z.discriminatedUnion('type', [
@@ -25,6 +27,12 @@ const ActionSchema = z.discriminatedUnion('type', [
     resolution: z.enum(Object.keys(RESOLUTIONS) as [keyof typeof RESOLUTIONS]).optional(),
     fps: z.union(FRAME_RATES.map((f) => z.literal(f))).optional(),
   }),
+  /** Search-bar input: a URL or words to search YouTube for. */
+  z.object({ type: z.literal('youtube/open'), source: youtubeId, input: z.string().max(4096) }),
+  /** The page navigated by itself (a click inside it); keeps `url` restorable. */
+  z.object({ type: z.literal('youtube/navigated'), source: youtubeId, url: z.url().max(8192) }),
+  z.object({ type: z.literal('youtube/setQuality'), source: youtubeId, quality: z.enum(QUALITIES) }),
+  z.object({ type: z.literal('youtube/setMuted'), source: youtubeId, muted: z.boolean() }),
 ]);
 
 export type Action = z.infer<typeof ActionSchema>;

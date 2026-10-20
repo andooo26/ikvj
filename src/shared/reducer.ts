@@ -2,7 +2,12 @@
 // this only encodes what each one means.
 
 import type { Action } from './actions';
-import type { AppState } from './state';
+import type { AppState, YouTubeSource, YouTubeSourceId } from './state';
+import { toPlayableUrl } from './youtube';
+
+function patchYouTube(state: AppState, id: YouTubeSourceId, patch: Partial<YouTubeSource>): AppState {
+  return { ...state, sources: { ...state.sources, [id]: { ...state.sources[id], ...patch } } };
+}
 
 export function reduce(state: AppState, action: Action): AppState {
   switch (action.type) {
@@ -27,5 +32,17 @@ export function reduce(state: AppState, action: Action): AppState {
           fps: action.fps ?? state.settings.fps,
         },
       };
+    case 'youtube/open': {
+      const url = toPlayableUrl(action.input);
+      return url ? patchYouTube(state, action.source, { url }) : state;
+    }
+    case 'youtube/navigated':
+      return state.sources[action.source].url === action.url
+        ? state
+        : patchYouTube(state, action.source, { url: action.url });
+    case 'youtube/setQuality':
+      return patchYouTube(state, action.source, { quality: action.quality });
+    case 'youtube/setMuted':
+      return patchYouTube(state, action.source, { muted: action.muted });
   }
 }

@@ -2,8 +2,13 @@
 // mirrored read-only into the renderer. Plain data only (it crosses IPC and is
 // persisted as JSON).
 
+import type { PageKind, Quality } from './youtube';
+
 export const SOURCE_IDS = ['A', 'B', 'C', 'D'] as const;
 export type SourceId = (typeof SOURCE_IDS)[number];
+
+export const YOUTUBE_SOURCE_IDS = ['A', 'B'] as const;
+export type YouTubeSourceId = (typeof YOUTUBE_SOURCE_IDS)[number];
 
 /** Engine slot index for each source (matches the native addon). */
 export const SLOT: Record<SourceId, number> = { A: 0, B: 1, C: 2, D: 3 };
@@ -23,7 +28,10 @@ export const MAX_BPM = 240;
 
 export interface YouTubeSource {
   kind: 'youtube';
+  /** Page to show; follows in-page navigation so it can be restored. */
   url: string;
+  quality: Quality;
+  muted: boolean;
 }
 
 export interface GenSource {
@@ -77,8 +85,8 @@ export function initialState(): AppState {
     settings: { resolution: '1080p', fps: 60 },
     clock: { bpm: 128, beatEpoch: 0 },
     sources: {
-      A: { kind: 'youtube', url: '' },
-      B: { kind: 'youtube', url: '' },
+      A: { kind: 'youtube', url: '', quality: 'highest', muted: false },
+      B: { kind: 'youtube', url: '', quality: 'highest', muted: false },
       C: { kind: 'gen', genre: 'techno', intensity: 0.6, tint: 0, seed: 1 },
       D: { kind: 'gen', genre: 'kawaii', intensity: 0.6, tint: 0, seed: 2 },
     },
@@ -101,4 +109,24 @@ export interface Stats {
   /** Engine backend and GPU, e.g. "metal · Apple M5". */
   engine: string;
   error: string | null;
+}
+
+/** Live state of one YouTube player, pushed a few times a second. */
+export interface PlayerStatus {
+  url: string;
+  title: string;
+  page: PageKind;
+  loading: boolean;
+  canGoBack: boolean;
+  /** CSS cursor the page wants under the pointer (e.g. "pointer"). */
+  cursor: string;
+  /** null until a <video> with metadata is on the page. */
+  video: {
+    time: number;
+    duration: number;
+    paused: boolean;
+    /** Decoded height now, and the best this video offers (0 = unknown). */
+    height: number;
+    maxHeight: number;
+  } | null;
 }
