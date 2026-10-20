@@ -125,22 +125,35 @@ Phase 0 で共有テクスチャの経路が成り立たなかったら、CPU �
 ikvj/
   docs/DESIGN.md
   native/                 N-API addon（mac: Obj-C++/Metal, win: C++/D3D11）
+    src/engine.h          両 OS 共通のインターフェース
+    test/selftest.cjs     Electron なしで動くセルフテスト
   vendor/                 Syphon.framework, Spout2 SDK
   src/
-    shared/               ipc.ts, 型定義, 定数（出力名・解像度プリセットなど）
+    shared/               main と renderer の両方が使う、副作用のないコード
+      state.ts            AppState の型と初期値、定数（出力名・解像度など）
+      actions.ts          アクションの zod スキーマ（renderer からの入力を検証）
+      reducer.ts          状態遷移（純粋関数）
+      ipc.ts              IPC チャンネル名と window.ikvj の型
     main/
-      app.ts              起動とウィンドウ管理
-      store.ts            状態と更新処理、UI への配信、保存と復元
-      sources/            youtube.ts, generative.ts
-      mixer/              レイヤー合成、Solo のフェード
-      sinks/              syphon.ts, spout.ts, projector.ts
-      youtube/            注入する CSS/JS、画質制御
-      auth/               Google ログイン
-    preload/
-    renderer/
-      components/         Tile, YouTubeTile, GenTile, Mixer, TopBar ...
-      gen/                sketch.ts, palette.ts, print.ts（旧版から移植）
+      index.ts            起動、ウィンドウ、IPC の受け口
+      store.ts            状態を持ち、変更を購読者に通知する
+      pipeline.ts         Engine と送信元を状態に合わせて作り直す、ミックスのループ
+      native.ts           addon の読み込みと型付け
+      sources/            youtube.ts, generative.ts（Phase 2〜3）
+      youtube/            注入する CSS/JS、画質制御（Phase 2）
+      auth/               Google ログイン（Phase 6）
+    preload/index.ts      window.ikvj を公開する（sandbox 有効、CJS で出力）
+    renderer/src/
+      store.ts            状態の購読（useAppState / useStats）と dispatch
+      components/         TopBar, Tile, Mixer, OutputStatus ...
+      gen/                sketch.ts, palette.ts, print.ts（旧版から移植、Phase 3）
 ```
+
+### 状態の流れ
+1. UI は `window.ikvj.dispatch(action)` を呼ぶだけで、状態を直接書き換えない。
+2. main は `parseAction`（zod）で検証してから `reduce` に通す。不正な入力は拒否して、状態は変えない。
+3. 新しい状態は UI に全体を配信する。`Pipeline` は前の状態との差分を見て、エンジンや送信元を作り直す（命令ではなく、状態に合わせる）。
+4. fps や受信中かどうかといった実行時の数値は状態に含めず、`stats` として 1 秒ごとに送る。
 
 ---
 
