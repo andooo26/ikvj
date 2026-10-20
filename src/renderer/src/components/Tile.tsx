@@ -1,18 +1,32 @@
+import type { PlayerStatuses } from '../../../shared/ipc';
 import { OUTPUT_NAMES, type AppState, type SourceId, type Stats } from '../../../shared/state';
 import { dispatch } from '../store';
 import { OutputStatus } from './OutputStatus';
+import { YouTubeSource } from './YouTubeSource';
 
 const KIND_LABEL = { youtube: 'YouTube', gen: '汎用' } as const;
 
 /** One source: header (identity + its own output) and the source body. */
-export function Tile({ id, state, stats }: { id: SourceId; state: AppState; stats: Stats | null }) {
+export function Tile({
+  id,
+  state,
+  stats,
+  players,
+}: {
+  id: SourceId;
+  state: AppState;
+  stats: Stats | null;
+  players: PlayerStatuses;
+}) {
   const source = state.sources[id];
   const on = state.outputs[id];
+  const title = id === 'A' || id === 'B' ? players[id]?.title : undefined;
   return (
     <section className="tile" data-kind={source.kind}>
       <header className="tile-head">
         <span className="tile-id">{id}</span>
         <span className="tile-kind">{KIND_LABEL[source.kind]}</span>
+        {title && <span className="tile-title muted">{title}</span>}
         <div className="spacer" />
         <OutputStatus
           name={OUTPUT_NAMES[id]}
@@ -29,9 +43,13 @@ export function Tile({ id, state, stats }: { id: SourceId; state: AppState; stat
           出力
         </button>
       </header>
-      <div className="tile-body">
-        <div className="placeholder">No source</div>
-      </div>
+      {(id === 'A' || id === 'B') && source.kind === 'youtube' ? (
+        <YouTubeSource id={id} source={source} status={players[id]} />
+      ) : (
+        <div className="tile-body">
+          <div className="placeholder">No source</div>
+        </div>
+      )}
     </section>
   );
 }
