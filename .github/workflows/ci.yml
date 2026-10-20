@@ -1,0 +1,31 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14 # Apple Silicon
+          - os: windows-latest # x64; no GPU, the engine falls back to WARP
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Build native engine
+        run: npm run build:native
+      - name: Native self-test
+        run: npm run test:native
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
