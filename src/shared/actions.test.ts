@@ -20,6 +20,9 @@ describe('parseAction', () => {
     ['bpm out of range', { type: 'clock/setBpm', bpm: 10 }],
     ['unsupported fps', { type: 'settings/set', fps: 50 }],
     ['unsupported resolution', { type: 'settings/set', resolution: '4320p' }],
+    ['unknown genre', { type: 'gen/set', source: 'C', genre: 'polka' }],
+    ['gen params on a YouTube source', { type: 'gen/set', source: 'A', intensity: 0.5 }],
+    ['tint out of range', { type: 'gen/set', source: 'C', tint: 2 }],
   ])('rejects %s', (_label, input) => {
     expect(parseAction(input).ok).toBe(false);
   });

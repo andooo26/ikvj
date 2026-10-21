@@ -3,11 +3,21 @@
 // `parseAction` before it reaches the reducer.
 
 import { z } from 'zod';
-import { FRAME_RATES, MAX_BPM, MIN_BPM, RESOLUTIONS, SOURCE_IDS, YOUTUBE_SOURCE_IDS } from './state';
+import { GENRE_IDS, MAX_SEED } from './gen';
+import {
+  FRAME_RATES,
+  GEN_SOURCE_IDS,
+  MAX_BPM,
+  MIN_BPM,
+  RESOLUTIONS,
+  SOURCE_IDS,
+  YOUTUBE_SOURCE_IDS,
+} from './state';
 import { QUALITIES } from './youtube';
 
 const sourceId = z.enum(SOURCE_IDS);
 const youtubeId = z.enum(YOUTUBE_SOURCE_IDS);
+const genId = z.enum(GEN_SOURCE_IDS);
 const unit = z.number().min(0).max(1);
 
 const ActionSchema = z.discriminatedUnion('type', [
@@ -33,6 +43,15 @@ const ActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('youtube/navigated'), source: youtubeId, url: z.url().max(8192) }),
   z.object({ type: z.literal('youtube/setQuality'), source: youtubeId, quality: z.enum(QUALITIES) }),
   z.object({ type: z.literal('youtube/setMuted'), source: youtubeId, muted: z.boolean() }),
+  /** Change any of a generative source's look parameters. */
+  z.object({
+    type: z.literal('gen/set'),
+    source: genId,
+    genre: z.enum(GENRE_IDS).optional(),
+    intensity: unit.optional(),
+    tint: z.number().min(-1).max(1).optional(),
+    seed: z.number().int().min(0).max(MAX_SEED).optional(),
+  }),
 ]);
 
 export type Action = z.infer<typeof ActionSchema>;

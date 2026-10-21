@@ -2,10 +2,14 @@
 // this only encodes what each one means.
 
 import type { Action } from './actions';
-import type { AppState, YouTubeSource, YouTubeSourceId } from './state';
+import type { AppState, GenSource, GenSourceId, YouTubeSource, YouTubeSourceId } from './state';
 import { toPlayableUrl } from './youtube';
 
 function patchYouTube(state: AppState, id: YouTubeSourceId, patch: Partial<YouTubeSource>): AppState {
+  return { ...state, sources: { ...state.sources, [id]: { ...state.sources[id], ...patch } } };
+}
+
+function patchGen(state: AppState, id: GenSourceId, patch: Partial<GenSource>): AppState {
   return { ...state, sources: { ...state.sources, [id]: { ...state.sources[id], ...patch } } };
 }
 
@@ -44,5 +48,11 @@ export function reduce(state: AppState, action: Action): AppState {
       return patchYouTube(state, action.source, { quality: action.quality });
     case 'youtube/setMuted':
       return patchYouTube(state, action.source, { muted: action.muted });
+    case 'gen/set': {
+      const { type: _type, source, ...patch } = action;
+      // Optional keys arrive as undefined when unset; don't let them clobber.
+      const defined = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined));
+      return patchGen(state, source, defined);
+    }
   }
 }

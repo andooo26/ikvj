@@ -57,4 +57,11 @@ describe('reduce', () => {
     expect(s.sources.B).toMatchObject({ quality: 'hd720', muted: true });
     expect(s.sources.A).toMatchObject({ quality: 'highest', muted: false });
   });
+
+  it('patches only the given generative parameters', () => {
+    const prev = initialState();
+    const s = reduce(prev, { type: 'gen/set', source: 'D', genre: 'dnb', tint: -0.5 });
+    expect(s.sources.D).toEqual({ ...prev.sources.D, genre: 'dnb', tint: -0.5 });
+    expect(s.sources.C).toBe(prev.sources.C);
+  });
 });

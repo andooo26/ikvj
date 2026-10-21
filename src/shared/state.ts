@@ -2,6 +2,7 @@
 // mirrored read-only into the renderer. Plain data only (it crosses IPC and is
 // persisted as JSON).
 
+import type { Genre } from './gen';
 import type { PageKind, Quality } from './youtube';
 
 export const SOURCE_IDS = ['A', 'B', 'C', 'D'] as const;
@@ -9,6 +10,9 @@ export type SourceId = (typeof SOURCE_IDS)[number];
 
 export const YOUTUBE_SOURCE_IDS = ['A', 'B'] as const;
 export type YouTubeSourceId = (typeof YOUTUBE_SOURCE_IDS)[number];
+
+export const GEN_SOURCE_IDS = ['C', 'D'] as const;
+export type GenSourceId = (typeof GEN_SOURCE_IDS)[number];
 
 /** Engine slot index for each source (matches the native addon). */
 export const SLOT: Record<SourceId, number> = { A: 0, B: 1, C: 2, D: 3 };
@@ -36,10 +40,10 @@ export interface YouTubeSource {
 
 export interface GenSource {
   kind: 'gen';
-  genre: string;
+  genre: Genre;
   /** 0..1 */
   intensity: number;
-  /** 0..359 */
+  /** -1..1, 0 = the preset's own palette */
   tint: number;
   seed: number;
 }
