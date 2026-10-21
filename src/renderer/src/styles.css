@@ -235,3 +235,4 @@ button:disabled { opacity: 0.4; cursor: default; }
 .gen-slider { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
 .gen-slider input { flex: 1; min-width: 0; }
 .seed { width: 56px; }
+.solo { padding: 2px 8px; font-weight: 700; }
