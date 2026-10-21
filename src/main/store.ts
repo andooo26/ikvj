@@ -12,6 +12,9 @@ type Listener = (next: AppState, prev: AppState) => void;
 export class Store {
   private state: AppState;
   private readonly listeners = new Set<Listener>();
+  /** Actions dispatched by a listener while it was being notified. */
+  private readonly queue: Action[] = [];
+  private notifying = false;
 
   constructor(state: AppState = initialState()) {
     this.state = state;
@@ -30,10 +33,24 @@ export class Store {
   }
 
   dispatch(action: Action): void {
-    const prev = this.state;
-    this.state = reduce(prev, action, Date.now());
-    if (this.state === prev) return;
-    for (const l of this.listeners) l(this.state, prev);
+    // A listener reacting to a change may dispatch again. Running that inline
+    // would hand the remaining listeners the older state after the newer one,
+    // so finish this round first, then apply it.
+    this.queue.push(action);
+    if (this.notifying) return;
+    this.notifying = true;
+    try {
+      for (let a = this.queue.shift(); a; a = this.queue.shift()) {
+        const prev = this.state;
+        const next = reduce(prev, a, Date.now());
+        if (next === prev) continue;
+        this.state = next;
+        for (const l of this.listeners) l(next, prev);
+      }
+    } finally {
+      this.notifying = false;
+      this.queue.length = 0;
+    }
   }
 
   subscribe(listener: Listener): () => void {
