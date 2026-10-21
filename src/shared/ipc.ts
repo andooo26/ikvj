@@ -3,6 +3,7 @@
 
 import type { Action } from './actions';
 import type { Command, PointerInput } from './commands';
+import type { GenFrameParams } from './gen';
 import type { AppState, PlayerStatus, Stats, YouTubeSourceId } from './state';
 
 export const IPC = {
@@ -20,6 +21,8 @@ export const IPC = {
   input: 'ikvj:input',
   /** main -> renderer: one player's live status, a few times a second. */
   player: 'ikvj:player',
+  /** main -> generative page: the parameters to draw with, on every change. */
+  genParams: 'ikvj:gen-params',
 } as const;
 
 export type PlayerStatuses = Partial<Record<YouTubeSourceId, PlayerStatus>>;
@@ -43,3 +46,8 @@ export interface IkvjApi {
  * `<canvas data-preview="A">`, so the renderer only has to render that element.
  */
 export const PREVIEW_ATTR = 'data-preview';
+
+/** What the generative page's preload exposes as `window.ikvjGen`. */
+export interface IkvjGenApi {
+  onParams(cb: (params: GenFrameParams) => void): () => void;
+}

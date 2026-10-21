@@ -1,15 +1,20 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
-import path from 'node:path';
 import { parseCommand, parsePointerInput } from '../shared/commands';
 import { IPC, type DispatchResult } from '../shared/ipc';
-import { YOUTUBE_SOURCE_IDS, type Stats, type YouTubeSourceId } from '../shared/state';
+import { GEN_SOURCE_IDS, YOUTUBE_SOURCE_IDS, initialState, type Stats, type YouTubeSourceId } from '../shared/state';
 import { Pipeline } from './pipeline';
+import { loadRendererPage, preloadPath } from './renderer-page';
+import { GenSource } from './sources/generative';
 import { YouTubePlayer } from './sources/youtube';
 import { Store } from './store';
 
-const store = new Store();
+// Beat 0 at launch: an epoch of 0 would put the clock billions of beats in,
+// where the sketch's sin-based hashing loses precision.
+const initial = initialState();
+const store = new Store({ ...initial, clock: { ...initial.clock, beatEpoch: Date.now() } });
 let pipeline: Pipeline | null = null;
 const players = new Map<YouTubeSourceId, YouTubePlayer>();
+const gens: GenSource[] = [];
 let mainWindow: BrowserWindow | null = null;
 
 function send(channel: string, ...payload: unknown[]): void {
@@ -25,7 +30,7 @@ function createMainWindow(): void {
     backgroundColor: '#0e0e10',
     title: 'ikvj',
     webPreferences: {
-      preload: path.join(import.meta.dirname, '../preload/index.cjs'),
+      preload: preloadPath('index'),
       sandbox: true,
       contextIsolation: true,
       nodeIntegration: false,
@@ -37,11 +42,7 @@ function createMainWindow(): void {
     // fires; without the UI there is no way to control the outputs, so quit.
     app.quit();
   });
-  if (process.env.ELECTRON_RENDERER_URL) {
-    mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
-  } else {
-    mainWindow.loadFile(path.join(import.meta.dirname, '../renderer/index.html'));
-  }
+  loadRendererPage(mainWindow.webContents, 'index');
 }
 
 ipcMain.handle(IPC.dispatch, (_e, action: unknown) => store.dispatchUnknown(action));
@@ -62,23 +63,31 @@ app.whenReady().then(() => {
   pipeline = new Pipeline(store, (stats: Stats) => send(IPC.stats, stats));
   pipeline.start();
   createMainWindow();
+  const previewFrame = () =>
+    mainWindow && !mainWindow.isDestroyed() ? mainWindow.webContents.mainFrame : null;
   for (const id of YOUTUBE_SOURCE_IDS) {
     const player = new YouTubePlayer(id, {
       store,
       pipeline,
-      previewFrame: () =>
-        mainWindow && !mainWindow.isDestroyed() ? mainWindow.webContents.mainFrame : null,
+      previewFrame,
       onStatus: (source, status) => send(IPC.player, source, status),
     });
     players.set(id, player);
     player.start();
   }
+  for (const id of GEN_SOURCE_IDS) {
+    const gen = new GenSource(id, { store, pipeline, previewFrame });
+    gens.push(gen);
+    gen.start();
+  }
 });
 
 app.on('will-quit', () => {
-  // Players first: their textures must go back before the engine is gone.
+  // Sources first: their textures must go back before the engine is gone.
   for (const player of players.values()) player.dispose();
   players.clear();
+  for (const gen of gens) gen.dispose();
+  gens.length = 0;
   pipeline?.dispose();
   pipeline = null;
 });

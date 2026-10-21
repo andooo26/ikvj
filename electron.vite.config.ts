@@ -10,9 +10,14 @@ export default defineConfig({
   },
   preload: {
     build: {
-      // Sandboxed preloads must be a single CommonJS file.
+      // Sandboxed preloads can't require siblings: each must be one CJS file.
+      isolatedEntries: true,
+      externalizeDeps: false,
       rolldownOptions: {
-        input: resolve(import.meta.dirname, 'src/preload/index.ts'),
+        input: {
+          index: resolve(import.meta.dirname, 'src/preload/index.ts'),
+          gen: resolve(import.meta.dirname, 'src/preload/gen.ts'),
+        },
         output: { format: 'cjs', entryFileNames: '[name].cjs' },
       },
     },
@@ -21,7 +26,12 @@ export default defineConfig({
     root: resolve(import.meta.dirname, 'src/renderer'),
     plugins: [react()],
     build: {
-      rolldownOptions: { input: resolve(import.meta.dirname, 'src/renderer/index.html') },
+      rolldownOptions: {
+        input: {
+          index: resolve(import.meta.dirname, 'src/renderer/index.html'),
+          gen: resolve(import.meta.dirname, 'src/renderer/gen.html'),
+        },
+      },
     },
   },
 });
