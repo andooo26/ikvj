@@ -17,7 +17,8 @@ type GuestWindow = Window & { __ikvjInstalled?: boolean; __ikvjQuality?: string 
 /**
  * Installed once per document. Every 400ms it re-asserts what YouTube keeps
  * undoing: the video-only layout (only on watch pages, so browsing keeps the
- * full UI), skipping ads, captions off, and the target quality.
+ * full UI), skipping ads, captions off, the target quality, and the video
+ * staying paused while browsing.
  */
 export function installGuest(css: string): void {
   const w = window as GuestWindow;
@@ -80,12 +81,21 @@ export function installGuest(css: string): void {
     p.setPlaybackQuality?.(pick);
   };
 
+  // Off a watch page the output is black, so a video still playing (YouTube's
+  // miniplayer) would only be heard. Re-asserted because YouTube resumes it.
+  const pauseMain = () => {
+    const v = document.querySelector<HTMLVideoElement>('#movie_player video');
+    if (v && !v.paused) v.pause();
+  };
+
   const tick = () => {
     try {
       ensureLayout();
       if (isWatch()) {
         handleAds();
         enforcePlayer();
+      } else {
+        pauseMain();
       }
     } catch {
       /* never let one bad tick stop the loop */
