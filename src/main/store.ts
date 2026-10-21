@@ -31,7 +31,7 @@ export class Store {
 
   dispatch(action: Action): void {
     const prev = this.state;
-    this.state = reduce(prev, action);
+    this.state = reduce(prev, action, Date.now());
     if (this.state === prev) return;
     for (const l of this.listeners) l(this.state, prev);
   }

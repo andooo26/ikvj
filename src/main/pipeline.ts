@@ -12,6 +12,7 @@ import {
   type SourceId,
   type Stats,
 } from '../shared/state';
+import { liveOpacity } from '../shared/mixer';
 import { loadNative, type Engine, type NativeModule } from './native';
 import type { Store } from './store';
 
@@ -151,8 +152,9 @@ export class Pipeline {
     if (!engine || !native) return;
     this.releaseCompleted();
     const { mixer } = this.store.get();
+    const opacity = liveOpacity(mixer, Date.now());
     try {
-      engine.compose(mixer.order.map((s) => ({ slot: SLOT[s], opacity: mixer.opacity[s] })));
+      engine.compose(mixer.order.map((s) => ({ slot: SLOT[s], opacity: opacity[s] })));
       for (const [output, id] of this.senders) {
         engine.publish(id, output === 'MIX' ? native.MIX : SLOT[output]);
       }

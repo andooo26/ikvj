@@ -4,6 +4,7 @@
 
 import { z } from 'zod';
 import { GENRE_IDS, MAX_SEED } from './gen';
+import { MAX_FADE_MS } from './mixer';
 import {
   FRAME_RATES,
   GEN_SOURCE_IDS,
@@ -29,6 +30,9 @@ const ActionSchema = z.discriminatedUnion('type', [
       .length(SOURCE_IDS.length)
       .refine((o) => new Set(o).size === o.length, 'order must list each source once'),
   }),
+  /** Fade this channel up to full and every other one out, over fadeMs. */
+  z.object({ type: z.literal('mixer/solo'), source: sourceId }),
+  z.object({ type: z.literal('mixer/setFadeMs'), ms: z.number().int().min(0).max(MAX_FADE_MS) }),
   z.object({ type: z.literal('output/set'), source: sourceId, on: z.boolean() }),
   z.object({ type: z.literal('clock/setBpm'), bpm: z.number().min(MIN_BPM).max(MAX_BPM) }),
   z.object({ type: z.literal('clock/sync'), at: z.number().nonnegative() }),

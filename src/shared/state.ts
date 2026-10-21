@@ -70,7 +70,15 @@ export interface AppState {
   mixer: {
     /** Bottom layer first; the last entry is drawn on top. */
     order: SourceId[];
+    /** Resting opacities, or where the running fade is heading. */
     opacity: Record<SourceId, number>;
+    /** Length of a Solo fade, ms (0 = cut). */
+    fadeMs: number;
+    /**
+     * A fade in progress from `from` to `opacity`. What is on air at a given
+     * moment is liveOpacity() in mixer.ts; nothing ticks the state itself.
+     */
+    fade: { from: Record<SourceId, number>; start: number; duration: number } | null;
   };
   /** Per-source Syphon/Spout output (ikvj-A..D). ikvj-MIX is always on. */
   outputs: Record<SourceId, boolean>;
@@ -97,6 +105,8 @@ export function initialState(): AppState {
     mixer: {
       order: ['A', 'B', 'C', 'D'],
       opacity: { A: 1, B: 0, C: 0, D: 0 },
+      fadeMs: 1000,
+      fade: null,
     },
     outputs: { A: false, B: false, C: false, D: false },
   };

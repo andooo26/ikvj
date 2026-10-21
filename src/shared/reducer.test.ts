@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { reduce } from './reducer';
-import { initialState } from './state';
+import type { Action } from './actions';
+import { liveOpacity } from './mixer';
+import { reduce as reduceAt } from './reducer';
+import { initialState, type AppState } from './state';
+
+const reduce = (s: AppState, a: Action) => reduceAt(s, a, 0);
 
 describe('reduce', () => {
   it('sets one channel opacity without touching the others', () => {
@@ -63,5 +67,36 @@ describe('reduce', () => {
     const s = reduce(prev, { type: 'gen/set', source: 'D', genre: 'dnb', tint: -0.5 });
     expect(s.sources.D).toEqual({ ...prev.sources.D, genre: 'dnb', tint: -0.5 });
     expect(s.sources.C).toBe(prev.sources.C);
+  });
+
+  describe('solo', () => {
+    it('fades the chosen channel up and the rest out from where they are', () => {
+      const s = reduceAt(initialState(), { type: 'mixer/solo', source: 'C' }, 5000);
+      expect(s.mixer.opacity).toEqual({ A: 0, B: 0, C: 1, D: 0 });
+      expect(s.mixer.fade).toEqual({ from: { A: 1, B: 0, C: 0, D: 0 }, start: 5000, duration: 1000 });
+      expect(liveOpacity(s.mixer, 5000)).toEqual({ A: 1, B: 0, C: 0, D: 0 });
+      expect(liveOpacity(s.mixer, 5500)).toEqual({ A: 0.5, B: 0, C: 0.5, D: 0 });
+      expect(liveOpacity(s.mixer, 6000)).toEqual({ A: 0, B: 0, C: 1, D: 0 });
+    });
+
+    it('cuts immediately when the fade length is 0', () => {
+      let s = reduce(initialState(), { type: 'mixer/setFadeMs', ms: 0 });
+      s = reduceAt(s, { type: 'mixer/solo', source: 'B' }, 100);
+      expect(s.mixer.fade).toBeNull();
+      expect(liveOpacity(s.mixer, 100)).toEqual({ A: 0, B: 1, C: 0, D: 0 });
+    });
+
+    it('starts a new solo from mid-fade without jumping', () => {
+      let s = reduceAt(initialState(), { type: 'mixer/solo', source: 'C' }, 0);
+      s = reduceAt(s, { type: 'mixer/solo', source: 'D' }, 500);
+      expect(s.mixer.fade?.from).toEqual({ A: 0.5, B: 0, C: 0.5, D: 0 });
+    });
+
+    it('lets a fader move cancel the fade, freezing the other channels', () => {
+      let s = reduceAt(initialState(), { type: 'mixer/solo', source: 'C' }, 0);
+      s = reduceAt(s, { type: 'mixer/setOpacity', source: 'B', value: 0.3 }, 500);
+      expect(s.mixer.fade).toBeNull();
+      expect(s.mixer.opacity).toEqual({ A: 0.5, B: 0.3, C: 0.5, D: 0 });
+    });
   });
 });

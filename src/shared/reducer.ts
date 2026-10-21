@@ -1,7 +1,9 @@
 // Pure state transitions. Actions are already validated (see actions.ts), so
-// this only encodes what each one means.
+// this only encodes what each one means. `now` (ms, wall clock) is passed in
+// rather than read, so fades stay testable.
 
 import type { Action } from './actions';
+import { liveOpacity } from './mixer';
 import type { AppState, GenSource, GenSourceId, YouTubeSource, YouTubeSourceId } from './state';
 import { toPlayableUrl } from './youtube';
 
@@ -13,13 +15,25 @@ function patchGen(state: AppState, id: GenSourceId, patch: Partial<GenSource>): 
   return { ...state, sources: { ...state.sources, [id]: { ...state.sources[id], ...patch } } };
 }
 
-export function reduce(state: AppState, action: Action): AppState {
+export function reduce(state: AppState, action: Action, now: number): AppState {
   switch (action.type) {
-    case 'mixer/setOpacity':
+    case 'mixer/setOpacity': {
+      // A hand on a fader wins over a running fade: freeze every channel where
+      // the fade has got to, then apply the move.
+      const opacity = { ...liveOpacity(state.mixer, now), [action.source]: action.value };
+      return { ...state, mixer: { ...state.mixer, opacity, fade: null } };
+    }
+    case 'mixer/solo': {
+      const from = liveOpacity(state.mixer, now);
+      const opacity = { A: 0, B: 0, C: 0, D: 0, [action.source]: 1 };
+      const { fadeMs } = state.mixer;
       return {
         ...state,
-        mixer: { ...state.mixer, opacity: { ...state.mixer.opacity, [action.source]: action.value } },
+        mixer: { ...state.mixer, opacity, fade: fadeMs > 0 ? { from, start: now, duration: fadeMs } : null },
       };
+    }
+    case 'mixer/setFadeMs':
+      return { ...state, mixer: { ...state.mixer, fadeMs: action.ms } };
     case 'mixer/reorder':
       return { ...state, mixer: { ...state.mixer, order: [...action.order] } };
     case 'output/set':
