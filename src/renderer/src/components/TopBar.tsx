@@ -10,6 +10,7 @@ import {
   type Stats,
 } from '../../../shared/state';
 import { dispatch } from '../store';
+import { ProjectorControl } from './ProjectorControl';
 
 /** Taps further apart than this start a new measurement. */
 const TAP_RESET_MS = 2000;
@@ -79,6 +80,7 @@ export function TopBar({ state, stats }: { state: AppState; stats: Stats | null 
       <span className="wordmark">ikvj</span>
       <BpmControl bpm={state.clock.bpm} />
       <div className="spacer" />
+      <ProjectorControl state={state} stats={stats} />
       <div className="group">
         <span className="label">出力</span>
         <select
