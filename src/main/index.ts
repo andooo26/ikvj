@@ -7,12 +7,15 @@ import { Projector, listDisplays } from './projector';
 import { loadRendererPage, preloadPath } from './renderer-page';
 import { GenSource } from './sources/generative';
 import { YouTubePlayer } from './sources/youtube';
+import { StateFile } from './state-file';
 import { Store } from './store';
 
+const stateFile = new StateFile();
 // Beat 0 at launch: an epoch of 0 would put the clock billions of beats in,
 // where the sketch's sin-based hashing loses precision.
-const initial = initialState();
-const store = new Store({ ...initial, clock: { ...initial.clock, beatEpoch: Date.now() } });
+const restored = stateFile.load(initialState());
+const store = new Store({ ...restored, clock: { ...restored.clock, beatEpoch: Date.now() } });
+stateFile.watch(store);
 let pipeline: Pipeline | null = null;
 let projector: Projector | null = null;
 const players = new Map<YouTubeSourceId, YouTubePlayer>();
@@ -90,6 +93,7 @@ app.whenReady().then(() => {
 });
 
 app.on('will-quit', () => {
+  stateFile.dispose();
   projector?.dispose();
   projector = null;
   // Sources first: their textures must go back before the engine is gone.
