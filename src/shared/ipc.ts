@@ -23,7 +23,19 @@ export const IPC = {
   player: 'ikvj:player',
   /** main -> generative page: the parameters to draw with, on every change. */
   genParams: 'ikvj:gen-params',
+  /** renderer -> main (invoke): open the Google sign-in window. */
+  login: 'ikvj:login',
+  /** renderer -> main (invoke): sign out, resolves with the new state. */
+  logout: 'ikvj:logout',
+  /** renderer -> main (invoke): current sign-in state. */
+  getLogin: 'ikvj:get-login',
+  /** main -> renderer: sign-in state changed. */
+  loginState: 'ikvj:login-state',
 } as const;
+
+export interface LoginState {
+  loggedIn: boolean;
+}
 
 export type PlayerStatuses = Partial<Record<YouTubeSourceId, PlayerStatus>>;
 
@@ -38,6 +50,11 @@ export interface IkvjApi {
   command(command: Command): Promise<DispatchResult>;
   input(input: PointerInput): void;
   onPlayer(cb: (id: YouTubeSourceId, status: PlayerStatus) => void): () => void;
+  /** Google sign-in for both players (YouTube Premium). */
+  login(): Promise<void>;
+  logout(): Promise<LoginState>;
+  getLogin(): Promise<LoginState>;
+  onLogin(cb: (state: LoginState) => void): () => void;
 }
 
 /**

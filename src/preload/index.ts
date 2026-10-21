@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, sharedTexture } from 'electron';
-import { IPC, PREVIEW_ATTR, type IkvjApi } from '../shared/ipc';
+import { IPC, PREVIEW_ATTR, type IkvjApi, type LoginState } from '../shared/ipc';
 import type { AppState, PlayerStatus, Stats, YouTubeSourceId } from '../shared/state';
 
 function listen<T extends unknown[]>(channel: string, cb: (...args: T) => void): () => void {
@@ -18,6 +18,10 @@ const api: IkvjApi = {
   command: (command) => ipcRenderer.invoke(IPC.command, command),
   input: (input) => ipcRenderer.send(IPC.input, input),
   onPlayer: (cb) => listen<[YouTubeSourceId, PlayerStatus]>(IPC.player, cb),
+  login: () => ipcRenderer.invoke(IPC.login),
+  logout: () => ipcRenderer.invoke(IPC.logout),
+  getLogin: () => ipcRenderer.invoke(IPC.getLogin),
+  onLogin: (cb) => listen<[LoginState]>(IPC.loginState, cb),
 };
 
 contextBridge.exposeInMainWorld('ikvj', api);

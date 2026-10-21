@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import { parseCommand, parsePointerInput } from '../shared/commands';
 import { IPC, type DispatchResult } from '../shared/ipc';
 import { GEN_SOURCE_IDS, YOUTUBE_SOURCE_IDS, initialState, type Stats, type YouTubeSourceId } from '../shared/state';
+import { getLoginState, installGoogleHeaderFilter, logout, openGoogleLogin } from './auth/google';
 import { Pipeline, type PipelineStats } from './pipeline';
 import { Projector, listDisplays } from './projector';
 import { loadRendererPage, preloadPath } from './renderer-page';
@@ -64,7 +65,27 @@ ipcMain.on(IPC.input, (_e, input: unknown) => {
 });
 store.subscribe((next) => send(IPC.state, next));
 
+/** Reload both players so they pick up the new cookies. */
+function reloadPlayers(): void {
+  for (const [source, player] of players) player.command({ type: 'player/reload', source });
+}
+
+ipcMain.handle(IPC.login, () => {
+  openGoogleLogin(mainWindow, (state) => {
+    send(IPC.loginState, state);
+    if (state.loggedIn) reloadPlayers();
+  });
+});
+ipcMain.handle(IPC.logout, async () => {
+  const state = await logout();
+  send(IPC.loginState, state);
+  reloadPlayers();
+  return state;
+});
+ipcMain.handle(IPC.getLogin, () => getLoginState());
+
 app.whenReady().then(() => {
+  installGoogleHeaderFilter();
   pipeline = new Pipeline(store, (p: PipelineStats) => {
     const stats: Stats = { ...p, displays: listDisplays(), projectorFps: projector?.framesPerSecond() ?? 0 };
     send(IPC.stats, stats);
