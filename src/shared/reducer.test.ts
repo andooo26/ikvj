@@ -99,4 +99,16 @@ describe('reduce', () => {
       expect(s.mixer.opacity).toEqual({ A: 0.5, B: 0.3, C: 0.5, D: 0 });
     });
   });
+
+  it('sets projector target and display independently', () => {
+    let s = reduce(initialState(), { type: 'projector/set', displayId: 7 });
+    s = reduce(s, { type: 'projector/set', target: 'C' });
+    expect(s.projector).toEqual({ target: 'C', displayId: 7, open: false });
+  });
+
+  it('opens the projector, and returns the same state when nothing changes', () => {
+    const s = reduce(initialState(), { type: 'projector/setOpen', open: true });
+    expect(s.projector.open).toBe(true);
+    expect(reduce(s, { type: 'projector/setOpen', open: true })).toBe(s);
+  });
 });

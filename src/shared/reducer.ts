@@ -62,6 +62,19 @@ export function reduce(state: AppState, action: Action, now: number): AppState {
       return patchYouTube(state, action.source, { quality: action.quality });
     case 'youtube/setMuted':
       return patchYouTube(state, action.source, { muted: action.muted });
+    case 'projector/set':
+      return {
+        ...state,
+        projector: {
+          ...state.projector,
+          target: action.target ?? state.projector.target,
+          displayId: action.displayId ?? state.projector.displayId,
+        },
+      };
+    case 'projector/setOpen':
+      return state.projector.open === action.open
+        ? state
+        : { ...state, projector: { ...state.projector, open: action.open } };
     case 'gen/set': {
       const { type: _type, source, ...patch } = action;
       // Optional keys arrive as undefined when unset; don't let them clobber.

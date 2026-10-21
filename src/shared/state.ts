@@ -82,9 +82,19 @@ export interface AppState {
   };
   /** Per-source Syphon/Spout output (ikvj-A..D). ikvj-MIX is always on. */
   outputs: Record<SourceId, boolean>;
+  /** Fullscreen output window on a display (a projector). */
+  projector: {
+    target: OutputId;
+    /** Electron display id; null = not chosen yet. */
+    displayId: number | null;
+    open: boolean;
+  };
 }
 
-export const OUTPUT_NAMES: Record<SourceId | 'MIX', string> = {
+export type OutputId = SourceId | 'MIX';
+export const OUTPUT_IDS = [...SOURCE_IDS, 'MIX'] as const satisfies readonly OutputId[];
+
+export const OUTPUT_NAMES: Record<OutputId, string> = {
   A: 'ikvj-A',
   B: 'ikvj-B',
   C: 'ikvj-C',
@@ -109,6 +119,7 @@ export function initialState(): AppState {
       fade: null,
     },
     outputs: { A: false, B: false, C: false, D: false },
+    projector: { target: 'MIX', displayId: null, open: false },
   };
 }
 
@@ -119,10 +130,21 @@ export interface Stats {
   /** Mix frames composed and published in the last second. */
   mixFps: number;
   /** Receiver connected per output; null when the protocol can't tell (Spout). */
-  clients: Partial<Record<SourceId | 'MIX', boolean | null>>;
+  clients: Partial<Record<OutputId, boolean | null>>;
   /** Engine backend and GPU, e.g. "metal · Apple M5". */
   engine: string;
   error: string | null;
+  displays: DisplayInfo[];
+  /** Frames the projector window drew in the last second (0 when closed). */
+  projectorFps: number;
+}
+
+export interface DisplayInfo {
+  id: number;
+  label: string;
+  width: number;
+  height: number;
+  primary: boolean;
 }
 
 /** Live state of one YouTube player, pushed a few times a second. */

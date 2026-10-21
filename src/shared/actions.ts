@@ -10,6 +10,7 @@ import {
   GEN_SOURCE_IDS,
   MAX_BPM,
   MIN_BPM,
+  OUTPUT_IDS,
   RESOLUTIONS,
   SOURCE_IDS,
   YOUTUBE_SOURCE_IDS,
@@ -47,6 +48,12 @@ const ActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('youtube/navigated'), source: youtubeId, url: z.url().max(8192) }),
   z.object({ type: z.literal('youtube/setQuality'), source: youtubeId, quality: z.enum(QUALITIES) }),
   z.object({ type: z.literal('youtube/setMuted'), source: youtubeId, muted: z.boolean() }),
+  z.object({
+    type: z.literal('projector/set'),
+    target: z.enum(OUTPUT_IDS).optional(),
+    displayId: z.number().int().optional(),
+  }),
+  z.object({ type: z.literal('projector/setOpen'), open: z.boolean() }),
   /** Change any of a generative source's look parameters. */
   z.object({
     type: z.literal('gen/set'),
