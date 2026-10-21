@@ -9,6 +9,7 @@ import {
   SLOT,
   SOURCE_IDS,
   type AppState,
+  type OutputId,
   type SourceId,
   type Stats,
 } from '../shared/state';
@@ -16,7 +17,15 @@ import { liveOpacity } from '../shared/mixer';
 import { loadNative, type Engine, type NativeModule } from './native';
 import type { Store } from './store';
 
-type OutputId = SourceId | 'MIX';
+/** What the pipeline itself reports; index.ts adds the rest of Stats. */
+export type PipelineStats = Omit<Stats, 'displays' | 'projectorFps'>;
+
+/** A finished output texture that can be imported elsewhere (e.g. a projector). */
+export interface OutputTexture {
+  handle: Buffer;
+  width: number;
+  height: number;
+}
 
 const zeroCounts = (): Record<SourceId, number> => ({ A: 0, B: 0, C: 0, D: 0 });
 
@@ -31,11 +40,12 @@ export class Pipeline {
   /** setSource token -> callback once the GPU no longer reads that texture. */
   private readonly pending = new Map<number, () => void>();
   private error: string | null = null;
+  private readonly frameListeners = new Set<() => void>();
   private readonly unsubscribe: () => void;
 
   constructor(
     private readonly store: Store,
-    private readonly onStats: (stats: Stats) => void,
+    private readonly onStats: (stats: PipelineStats) => void,
   ) {
     this.unsubscribe = store.subscribe((next, prev) => this.onChange(next, prev));
   }
@@ -69,6 +79,23 @@ export class Pipeline {
     } catch (err) {
       this.error = String(err instanceof Error ? err.message : err);
       done();
+    }
+  }
+
+  /** Called after every composed mix frame (all outputs are fresh then). */
+  onFrame(listener: () => void): () => void {
+    this.frameListeners.add(listener);
+    return () => this.frameListeners.delete(listener);
+  }
+
+  /** The engine's texture for an output, valid until the engine is rebuilt. */
+  outputTexture(output: OutputId): OutputTexture | null {
+    if (!this.engine || !this.native) return null;
+    const { width, height } = RESOLUTIONS[this.store.get().settings.resolution];
+    try {
+      return { handle: this.engine.sharedHandle(this.targetOf(output)), width, height };
+    } catch {
+      return null;
     }
   }
 
@@ -156,12 +183,18 @@ export class Pipeline {
     try {
       engine.compose(mixer.order.map((s) => ({ slot: SLOT[s], opacity: opacity[s] })));
       for (const [output, id] of this.senders) {
-        engine.publish(id, output === 'MIX' ? native.MIX : SLOT[output]);
+        engine.publish(id, this.targetOf(output));
       }
       this.mixFrames++;
     } catch (err) {
       this.error = String(err instanceof Error ? err.message : err);
+      return;
     }
+    for (const l of this.frameListeners) l();
+  }
+
+  private targetOf(output: OutputId): number {
+    return output === 'MIX' ? this.native!.MIX : SLOT[output];
   }
 
   private reportStats(): void {

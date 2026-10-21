@@ -4,7 +4,7 @@ import path from 'node:path';
 /** Load one of the renderer's HTML entries (dev server in dev, files when built). */
 export function loadRendererPage(
   wc: WebContents,
-  page: 'index' | 'gen',
+  page: 'index' | 'gen' | 'projector',
   query: Record<string, string> = {},
 ): void {
   const devUrl = process.env.ELECTRON_RENDERER_URL;

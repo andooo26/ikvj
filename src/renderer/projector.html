@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'" />
+    <title>ikvj projector</title>
+    <!--
+      Nothing to run here: preload draws each frame (a shared texture) into the
+      canvas registered as data-preview="projector". The canvas takes the
+      output's size; object-fit letterboxes it onto the display.
+    -->
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #000; cursor: none; }
+      canvas { display: block; width: 100vw; height: 100vh; object-fit: contain; }
+    </style>
+  </head>
+  <body>
+    <canvas data-preview="projector"></canvas>
+  </body>
+</html>

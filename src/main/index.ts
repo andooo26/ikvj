@@ -2,7 +2,8 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import { parseCommand, parsePointerInput } from '../shared/commands';
 import { IPC, type DispatchResult } from '../shared/ipc';
 import { GEN_SOURCE_IDS, YOUTUBE_SOURCE_IDS, initialState, type Stats, type YouTubeSourceId } from '../shared/state';
-import { Pipeline } from './pipeline';
+import { Pipeline, type PipelineStats } from './pipeline';
+import { Projector, listDisplays } from './projector';
 import { loadRendererPage, preloadPath } from './renderer-page';
 import { GenSource } from './sources/generative';
 import { YouTubePlayer } from './sources/youtube';
@@ -13,6 +14,7 @@ import { Store } from './store';
 const initial = initialState();
 const store = new Store({ ...initial, clock: { ...initial.clock, beatEpoch: Date.now() } });
 let pipeline: Pipeline | null = null;
+let projector: Projector | null = null;
 const players = new Map<YouTubeSourceId, YouTubePlayer>();
 const gens: GenSource[] = [];
 let mainWindow: BrowserWindow | null = null;
@@ -60,8 +62,13 @@ ipcMain.on(IPC.input, (_e, input: unknown) => {
 store.subscribe((next) => send(IPC.state, next));
 
 app.whenReady().then(() => {
-  pipeline = new Pipeline(store, (stats: Stats) => send(IPC.stats, stats));
+  pipeline = new Pipeline(store, (p: PipelineStats) => {
+    const stats: Stats = { ...p, displays: listDisplays(), projectorFps: projector?.framesPerSecond() ?? 0 };
+    send(IPC.stats, stats);
+  });
   pipeline.start();
+  projector = new Projector(store, pipeline);
+  projector.start();
   createMainWindow();
   const previewFrame = () =>
     mainWindow && !mainWindow.isDestroyed() ? mainWindow.webContents.mainFrame : null;
@@ -83,6 +90,8 @@ app.whenReady().then(() => {
 });
 
 app.on('will-quit', () => {
+  projector?.dispose();
+  projector = null;
   // Sources first: their textures must go back before the engine is gone.
   for (const player of players.values()) player.dispose();
   players.clear();

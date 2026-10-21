@@ -30,6 +30,7 @@ export default defineConfig({
         input: {
           index: resolve(import.meta.dirname, 'src/renderer/index.html'),
           gen: resolve(import.meta.dirname, 'src/renderer/gen.html'),
+          projector: resolve(import.meta.dirname, 'src/renderer/projector.html'),
         },
       },
     },
