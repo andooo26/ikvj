@@ -1,17 +1,17 @@
 // One YouTube (or any URL) source: an offscreen page (see offscreen.ts) that
 // the user clicks through from its preview; input is forwarded to the page.
 
-import { session, type WebContents } from 'electron';
+import type { WebContents } from 'electron';
 import type { Command, PointerInput } from '../../shared/commands';
 import type { AppState, PlayerStatus, YouTubeSourceId } from '../../shared/state';
 import { pageKind, type PageKind } from '../../shared/youtube';
 import type { Store } from '../store';
 import playerOnlyCss from '../youtube/player-only.css?raw';
 import { inject, installGuest, readVideo, seekTo, setQuality, skipBy, togglePlay } from '../youtube/guest';
+import { playerSession } from '../youtube/session';
 import { OffscreenView, VIEW_H, VIEW_W, type ViewDeps } from './offscreen';
 
 const STATUS_MS = 250;
-export const PLAYER_PARTITION = 'persist:youtube';
 
 /** Electron cursor types -> CSS cursors (anything else falls back to default). */
 const CURSORS: Record<string, string> = {
@@ -43,11 +43,8 @@ export class YouTubePlayer {
     private readonly deps: PlayerDeps,
   ) {
     this.unsubscribe = deps.store.subscribe((next, prev) => this.onChange(next, prev));
-    const ses = session.fromPartition(PLAYER_PARTITION);
-    // A plain Chrome UA: some videos and features are gated on a known browser.
-    ses.setUserAgent(ses.getUserAgent().replace(/ Electron\/\S+/, '').replace(/ ikvj\/\S+/, ''));
     this.view = new OffscreenView(id, deps, {
-      session: ses,
+      session: playerSession(),
       autoplayPolicy: 'no-user-gesture-required',
     });
   }
