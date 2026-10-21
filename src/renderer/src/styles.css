@@ -110,7 +110,6 @@ input[type='range'] { accent-color: var(--accent); }
   place-items: center;
   background: #000;
 }
-.placeholder { color: var(--muted); }
 
 .status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: #44444b; }
@@ -224,3 +223,15 @@ button:disabled { opacity: 0.4; cursor: default; }
 .transport .skip { padding: 2px 6px; font-size: 12px; }
 .playpause { width: 36px; }
 .seek { flex: 1; min-width: 60px; }
+
+/* ---- generative source ---- */
+.gen-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px;
+  border-top: 1px solid var(--line);
+}
+.gen-slider { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
+.gen-slider input { flex: 1; min-width: 0; }
+.seed { width: 56px; }

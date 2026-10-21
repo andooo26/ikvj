@@ -1,6 +1,7 @@
 import type { PlayerStatuses } from '../../../shared/ipc';
 import { OUTPUT_NAMES, type AppState, type SourceId, type Stats } from '../../../shared/state';
 import { dispatch } from '../store';
+import { GenSource } from './GenSource';
 import { OutputStatus } from './OutputStatus';
 import { YouTubeSource } from './YouTubeSource';
 
@@ -43,13 +44,10 @@ export function Tile({
           出力
         </button>
       </header>
-      {(id === 'A' || id === 'B') && source.kind === 'youtube' ? (
+      {(id === 'A' || id === 'B') && source.kind === 'youtube' && (
         <YouTubeSource id={id} source={source} status={players[id]} />
-      ) : (
-        <div className="tile-body">
-          <div className="placeholder">No source</div>
-        </div>
       )}
+      {(id === 'C' || id === 'D') && source.kind === 'gen' && <GenSource id={id} source={source} />}
     </section>
   );
 }
