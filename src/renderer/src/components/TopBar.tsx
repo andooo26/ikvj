@@ -10,6 +10,7 @@ import {
   type Stats,
 } from '../../../shared/state';
 import { dispatch } from '../store';
+import { LoginControl } from './LoginControl';
 import { ProjectorControl } from './ProjectorControl';
 
 /** Taps further apart than this start a new measurement. */
@@ -104,6 +105,7 @@ export function TopBar({ state, stats }: { state: AppState; stats: Stats | null 
           ))}
         </select>
       </div>
+      <LoginControl />
       <span className="muted" title="GPU エンジン">
         {stats?.engine ?? '…'}
       </span>
