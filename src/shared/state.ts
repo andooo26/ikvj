@@ -32,7 +32,7 @@ export const MAX_BPM = 240;
 
 export interface YouTubeSource {
   kind: 'youtube';
-  /** Page to show; follows in-page navigation so it can be restored. */
+  /** Page to show; follows in-page navigation. Not saved across restarts. */
   url: string;
   quality: Quality;
   muted: boolean;

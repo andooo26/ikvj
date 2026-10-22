@@ -30,12 +30,23 @@ describe('persist round trip', () => {
     const restored = fromPersisted(saved, initialState());
     const expected = customized();
     expect(restored.settings).toEqual(expected.settings);
-    expect(restored.sources).toEqual(expected.sources);
+    expect(restored.sources).toEqual({
+      ...expected.sources,
+      A: { ...expected.sources.A, url: '' }, // the page is never restored
+    });
     expect(restored.mixer.order).toEqual(expected.mixer.order);
     expect(restored.mixer.opacity).toEqual(expected.mixer.opacity);
     expect(restored.mixer.fadeMs).toBe(2000);
     expect(restored.outputs).toEqual(expected.outputs);
     expect(restored.clock.bpm).toBe(140);
+  });
+
+  it('does not save the players\' pages, and ignores one in an older file', () => {
+    const saved = JSON.parse(JSON.stringify(toPersisted(customized())));
+    expect(saved.sources.A).not.toHaveProperty('url');
+    saved.sources.A.url = 'https://www.youtube.com/watch?v=aqz-KE-bpKQ';
+    const restored = fromPersisted(saved, initialState());
+    expect(restored.sources.A).toEqual({ kind: 'youtube', url: '', quality: 'hd1080', muted: true });
   });
 
   it('never restores an open projector, a running fade or the beat epoch', () => {
@@ -59,7 +70,7 @@ describe('fromPersisted with bad input', () => {
     saved.sources.D.genre = 'polka'; // unknown genre -> whole source D falls back
     saved.mixer.order = ['A', 'A', 'B', 'C']; // not a permutation
     saved.mixer.opacity.B = 7; // out of range
-    saved.sources.A.url = 'javascript:alert(1)'; // not http(s)
+    saved.sources.A.quality = 'hd9999'; // unknown quality
     const base = initialState();
     const restored = fromPersisted(saved, base);
 

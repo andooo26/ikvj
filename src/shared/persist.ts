@@ -5,21 +5,34 @@
 import { z } from 'zod';
 import { GENRE_IDS, MAX_SEED } from './gen';
 import { MAX_FADE_MS } from './mixer';
-import { FRAME_RATES, MAX_BPM, MIN_BPM, OUTPUT_IDS, RESOLUTIONS, SOURCE_IDS, type AppState } from './state';
+import {
+  FRAME_RATES,
+  MAX_BPM,
+  MIN_BPM,
+  OUTPUT_IDS,
+  RESOLUTIONS,
+  SOURCE_IDS,
+  type AppState,
+  type YouTubeSource,
+} from './state';
 import { QUALITIES } from './youtube';
 
 export const PERSIST_VERSION = 1;
 
+/** A YouTube source minus its page: a restart starts on YouTube's home page. */
+type SavedYouTube = Omit<YouTubeSource, 'url'>;
+
 /**
- * The saved subset of AppState. Left out on purpose: whether the projector is
- * open (a restart must never go fullscreen by itself), a fade in progress, and
- * the beat epoch (the clock restarts at launch).
+ * The saved subset of AppState. Left out on purpose: the players' pages (the
+ * last video must not start playing at launch), whether the projector is open
+ * (a restart must never go fullscreen by itself), a fade in progress, and the
+ * beat epoch (the clock restarts at launch).
  */
 export interface Persisted {
   version: typeof PERSIST_VERSION;
   settings: AppState['settings'];
   bpm: number;
-  sources: AppState['sources'];
+  sources: Omit<AppState['sources'], 'A' | 'B'> & { A: SavedYouTube; B: SavedYouTube };
   mixer: Pick<AppState['mixer'], 'order' | 'opacity' | 'fadeMs'>;
   outputs: AppState['outputs'];
   projector: Pick<AppState['projector'], 'target' | 'displayId'>;
@@ -28,11 +41,12 @@ export interface Persisted {
 export function toPersisted(state: AppState): Persisted {
   const { order, opacity, fadeMs } = state.mixer;
   const { target, displayId } = state.projector;
+  const youtube = ({ url: _url, ...rest }: YouTubeSource): SavedYouTube => rest;
   return {
     version: PERSIST_VERSION,
     settings: state.settings,
     bpm: state.clock.bpm,
-    sources: state.sources,
+    sources: { ...state.sources, A: youtube(state.sources.A), B: youtube(state.sources.B) },
     mixer: { order, opacity, fadeMs },
     outputs: state.outputs,
     projector: { target, displayId },
@@ -47,9 +61,10 @@ function pick<T>(schema: z.ZodType<T>, value: unknown, fallback: T): T {
   return r.success ? r.data : fallback;
 }
 
+// Files from before the page stopped being saved may still carry `url`; it is
+// dropped like any other unknown key.
 const youtubeSchema = z.object({
   kind: z.literal('youtube'),
-  url: z.string().max(8192).refine((u) => u === '' || /^https?:\/\//.test(u)),
   quality: z.enum(QUALITIES),
   muted: z.boolean(),
 });
@@ -94,8 +109,8 @@ export function fromPersisted(raw: unknown, base: AppState): AppState {
     },
     clock: { ...base.clock, bpm: pick(z.number().min(MIN_BPM).max(MAX_BPM), p.bpm, base.clock.bpm) },
     sources: {
-      A: pick(youtubeSchema, sources.A, base.sources.A),
-      B: pick(youtubeSchema, sources.B, base.sources.B),
+      A: { ...base.sources.A, ...pick(youtubeSchema, sources.A, base.sources.A) },
+      B: { ...base.sources.B, ...pick(youtubeSchema, sources.B, base.sources.B) },
       C: pick(genSchema, sources.C, base.sources.C),
       D: pick(genSchema, sources.D, base.sources.D),
     },
