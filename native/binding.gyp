@@ -19,9 +19,10 @@
             "OTHER_LDFLAGS": [
               "-F<(module_root_dir)/../vendor/syphon",
               "-framework Syphon",
-              # Dev layout: native/build/Release/ikvj_native.node -> vendor/syphon.
-              # Packaged builds get their own rpath in Phase 7.
-              "-Wl,-rpath,@loader_path/../../../vendor/syphon"
+              # Dev: native/build/Release/ikvj_native.node -> vendor/syphon.
+              "-Wl,-rpath,@loader_path/../../../vendor/syphon",
+              # Packaged: Contents/Resources/native -> Contents/Frameworks.
+              "-Wl,-rpath,@loader_path/../../Frameworks"
             ]
           },
           "link_settings": {

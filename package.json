@@ -1,11 +1,16 @@
 {
   "name": "ikvj",
-  "version": "0.0.0",
+  "productName": "ikvj",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "description": "YouTube x2 + generative x2 VJ source mixer with Syphon (macOS) / Spout (Windows) output",
   "author": "andooo26",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/andooo26/ikvj.git"
+  },
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
@@ -15,7 +20,8 @@
     "test": "vitest run",
     "build:native": "node-gyp rebuild --directory native",
     "test:native": "node native/test/selftest.cjs",
-    "phase0": "electron spike/phase0/main.cjs"
+    "phase0": "electron spike/phase0/main.cjs",
+    "dist": "electron-vite build && electron-builder"
   },
   "dependencies": {
     "react": "^19.3.1",
@@ -28,6 +34,7 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
     "electron": "^44.9.1",
+    "electron-builder": "^26.15.3",
     "electron-vite": "^6.0.0",
     "node-addon-api": "^8.9.2",
     "node-gyp": "^13.1.0",

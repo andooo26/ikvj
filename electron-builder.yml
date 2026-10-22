@@ -1,0 +1,53 @@
+# Packaging for GitHub Releases. Unsigned on purpose (see README): the mac app
+# gets an ad-hoc signature only, the Windows installer none.
+appId: io.github.andooo26.ikvj
+productName: ikvj
+copyright: Copyright © 2026 andooo26
+
+directories:
+  output: dist
+
+# The app itself is the electron-vite build; the source stays out of the asar.
+files:
+  - out/**
+  - package.json
+
+# The GPU engine lives next to the asar (a .node can't load from inside it):
+# Resources/native/ikvj_native.node. src/main/native.ts loads it from there.
+extraResources:
+  - from: native/build/Release/ikvj_native.node
+    to: native/ikvj_native.node
+
+mac:
+  target:
+    - target: dmg
+      arch: arm64
+    - target: zip
+      arch: arm64
+  category: public.app-category.video
+  # Ad-hoc signature: without any valid signature Apple Silicon reports the app
+  # as "damaged" instead of offering "Open" for an unidentified developer.
+  identity: '-'
+  hardenedRuntime: false
+  # Contents/Frameworks/Syphon.framework, found by the addon through its
+  # @loader_path/../../Frameworks rpath (see native/binding.gyp).
+  extraFiles:
+    - from: vendor/syphon/Syphon.framework
+      to: Frameworks/Syphon.framework
+
+win:
+  target:
+    - target: nsis
+      arch: x64
+
+nsis:
+  # No spaces: GitHub turns them into dots in Release asset names.
+  artifactName: ${productName}-Setup-${version}.${ext}
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+
+publish:
+  provider: github
+  owner: andooo26
+  repo: ikvj
+  releaseType: draft

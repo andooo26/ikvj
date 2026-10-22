@@ -40,9 +40,11 @@ let cached: NativeModule | null = null;
 
 export function loadNative(): NativeModule {
   if (cached) return cached;
-  // Dev: <repo>/native/build/Release. Packaged layout is decided with the
-  // installer (unpacked next to the asar).
-  const file = path.join(app.getAppPath(), 'native', 'build', 'Release', 'ikvj_native.node');
+  // Packaged: Resources/native (electron-builder extraResources); a .node
+  // can't be loaded from inside the asar. Dev: the node-gyp build output.
+  const file = app.isPackaged
+    ? path.join(process.resourcesPath, 'native', 'ikvj_native.node')
+    : path.join(app.getAppPath(), 'native', 'build', 'Release', 'ikvj_native.node');
   cached = createRequire(import.meta.url)(file) as NativeModule;
   return cached;
 }
