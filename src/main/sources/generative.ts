@@ -31,6 +31,7 @@ export class GenSource {
 
   start(): void {
     this.createPage(this.deps.store.get());
+    this.syncOutput(this.deps.store.get());
   }
 
   dispose(): void {
@@ -44,6 +45,12 @@ export class GenSource {
     } else if (next.clock !== prev.clock || next.sources[this.id] !== prev.sources[this.id]) {
       this.sendParams(next);
     }
+    this.syncOutput(next);
+  }
+
+  /** "None" outputs black, without passing frames through the engine. */
+  private syncOutput(state: AppState): void {
+    this.view.setOutput(state.sources[this.id].genre !== 'none');
   }
 
   private createPage(state: AppState): void {

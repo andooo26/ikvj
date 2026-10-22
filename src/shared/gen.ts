@@ -1,6 +1,7 @@
 // Generative presets, shared by the UI (pickers) and the sketch renderer.
 
 export const GENRES = [
+  { id: 'none', label: 'なし' },
   { id: 'techno', label: 'Techno' },
   { id: 'house', label: 'House' },
   { id: 'dnb', label: 'Drum & Bass' },
@@ -13,6 +14,8 @@ export const GENRES = [
 
 export type Genre = (typeof GENRES)[number]['id'];
 export const GENRE_IDS = GENRES.map((g) => g.id) as [Genre, ...Genre[]];
+/** 'none' draws nothing: the source outputs black. */
+export type SketchGenre = Exclude<Genre, 'none'>;
 
 export const MAX_SEED = 99999;
 

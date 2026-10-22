@@ -10,7 +10,7 @@
  * inks a little without dissolving the palette (see `ink()`).
  */
 
-import type { Genre } from '../../../shared/gen';
+import type { SketchGenre } from '../../../shared/gen';
 
 export type Hsl = [h: number, s: number, l: number];
 
@@ -23,7 +23,7 @@ export interface Palette {
   light: boolean;
 }
 
-export const PALETTES: Record<Genre, Palette> = {
+export const PALETTES: Record<SketchGenre, Palette> = {
   // Acid lime on true black with a signal red — the classic flyer two-colour.
   techno: {
     paper: [0, 0, 4],

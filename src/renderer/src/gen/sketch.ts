@@ -96,6 +96,11 @@ export function drawGen(
   nowMs: number,
   p: GenFrameParams,
 ): void {
+  if (p.genre === 'none') {
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, w, h);
+    return;
+  }
   const bpm = Math.max(20, Math.min(300, p.bpm));
   const beatMs = 60000 / bpm;
   const rawBeat = (nowMs - p.beatEpoch) / beatMs;

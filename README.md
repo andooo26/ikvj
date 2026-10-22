@@ -3,7 +3,7 @@
 YouTube 2 本と汎用（ジェネラティブ）グラフィックス 2 本をミックスして、**Syphon**（macOS）/ **Spout**（Windows）と、プロジェクターに出力する VJ ツール。
 
 - **A / B**：YouTube（検索・URL 貼り付け・プレビュー上でクリックして操作）
-- **C / D**：BPM に同期する汎用グラフィックス（Techno、House、Kawaii、Hyperpop ほか 8 種類）
+- **C / D**：BPM に同期する汎用グラフィックス（Techno、House、Kawaii、Hyperpop ほか 8 種類。「なし」で何も出さない）
 - **4ch ミキサー**：レイヤーの重ね順はドラッグで入れ替え、Solo で自動フェード
 - **出力**：`ikvj-MIX` は常時。`ikvj-A`〜`ikvj-D` はソースごとに ON/OFF。プロジェクターには A〜D か MIX を全画面で出す
 - 映像は GPU だけを通る（CPU でのピクセルのコピーなし）。解像度は 720p / 1080p / 2160p、30 / 60fps から選べる

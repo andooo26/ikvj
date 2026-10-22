@@ -5,6 +5,8 @@ import { dispatch } from '../store';
 
 export function GenSource({ id, source }: { id: GenSourceId; source: GenSourceState }) {
   const set = (patch: Partial<Omit<GenSourceState, 'kind'>>) => dispatch({ type: 'gen/set', source: id, ...patch });
+  // "None" draws nothing, so the look controls have nothing to act on.
+  const off = source.genre === 'none';
   return (
     <>
       <div className="tile-body">
@@ -32,6 +34,7 @@ export function GenSource({ id, source }: { id: GenSourceId; source: GenSourceSt
             max={1}
             step={0.01}
             value={source.intensity}
+            disabled={off}
             onChange={(e) => set({ intensity: Number(e.target.value) })}
           />
         </label>
@@ -43,11 +46,13 @@ export function GenSource({ id, source }: { id: GenSourceId; source: GenSourceSt
             max={1}
             step={0.01}
             value={source.tint}
+            disabled={off}
             onChange={(e) => set({ tint: Number(e.target.value) })}
             onDoubleClick={() => set({ tint: 0 })}
           />
         </label>
         <button
+          disabled={off}
           onClick={() => set({ seed: Math.floor(Math.random() * (MAX_SEED + 1)) })}
           title="構図と配色の乱数を引き直す"
         >
