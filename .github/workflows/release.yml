@@ -1,0 +1,39 @@
+name: release
+
+# Push a tag like v0.1.0 (matching package.json's version) to build both
+# platforms and attach the installers to a draft GitHub Release.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14 # Apple Silicon -> dmg / zip (arm64)
+            platform: --mac
+          - os: windows-latest # x64 -> NSIS installer
+            platform: --win
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Build native engine
+        run: npm run build:native
+      - name: Native self-test
+        run: npm run test:native
+      - run: npm test
+      - name: Build and publish
+        run: npx electron-vite build && npx electron-builder ${{ matrix.platform }} --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
