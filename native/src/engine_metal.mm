@@ -10,6 +10,9 @@
 #import <Foundation/Foundation.h>
 #import <IOSurface/IOSurface.h>
 #import <Metal/Metal.h>
+#import <OpenGL/OpenGL.h>
+#import <OpenGL/gl.h>
+#import <OpenGL/glext.h>
 #import <Syphon/Syphon.h>
 
 #include <map>
@@ -237,10 +240,12 @@ class MetalEngine final : public Engine {
     }
     if (!ValidTarget(target, error)) return false;
     id<MTLCommandBuffer> cb = [queue_ commandBuffer];
+    // Syphon frames follow OpenGL's bottom-up rows, which is what receivers
+    // (VDMX, Resolume, ...) assume. Our targets are top-down, so flip on publish.
     [it->second publishFrameTexture:targets_[target]
                     onCommandBuffer:cb
                         imageRegion:NSMakeRect(0, 0, width_, height_)
-                            flipped:NO];
+                            flipped:YES];
     [cb commit];
     return true;
   }
@@ -359,50 +364,58 @@ std::vector<std::string> ListServers() {
   return names;
 }
 
+// Receives through SyphonOpenGLClient, the way VDMX / Resolume / most other
+// receivers do, so the probe sees the frame in the orientation they show it.
 bool ProbeReceive(const std::string& name, int x, int y, uint8_t out_rgba[4]) {
-  static id<MTLDevice> device = MTLCreateSystemDefaultDevice();
-  static id<MTLCommandQueue> queue = [device newCommandQueue];
-  static NSMutableDictionary<NSString*, SyphonMetalClient*>* clients = [NSMutableDictionary new];
+  static CGLContextObj context = [] {
+    CGLPixelFormatAttribute attrs[] = {kCGLPFAAccelerated, kCGLPFAAllowOfflineRenderers,
+                                       (CGLPixelFormatAttribute)0};
+    CGLPixelFormatObj pf = nullptr;
+    GLint count = 0;
+    CGLContextObj ctx = nullptr;
+    if (CGLChoosePixelFormat(attrs, &pf, &count) == kCGLNoError && pf) {
+      CGLCreateContext(pf, nullptr, &ctx);
+      CGLReleasePixelFormat(pf);
+    }
+    return ctx;
+  }();
+  static NSMutableDictionary<NSString*, SyphonOpenGLClient*>* clients = [NSMutableDictionary new];
+  if (!context) return false;
 
   NSString* key = @(name.c_str());
-  SyphonMetalClient* client = clients[key];
+  SyphonOpenGLClient* client = clients[key];
   if (!client) {
     for (NSDictionary* d in [SyphonServerDirectory sharedDirectory].servers) {
       if ([d[SyphonServerDescriptionNameKey] isEqualToString:key]) {
-        client = [[SyphonMetalClient alloc] initWithServerDescription:d
-                                                               device:device
-                                                              options:nil
-                                                      newFrameHandler:nil];
+        client = [[SyphonOpenGLClient alloc] initWithServerDescription:d
+                                                               context:context
+                                                               options:nil
+                                                       newFrameHandler:nil];
         if (client) clients[key] = client;
         break;
       }
     }
     return false;
   }
-  id<MTLTexture> frame = [client newFrameImage];
-  if (!frame || x < 0 || y < 0 || x >= (int)frame.width || y >= (int)frame.height) return false;
-  id<MTLBuffer> buf = [device newBufferWithLength:4 options:MTLResourceStorageModeShared];
-  id<MTLCommandBuffer> cb = [queue commandBuffer];
-  id<MTLBlitCommandEncoder> blit = [cb blitCommandEncoder];
-  [blit copyFromTexture:frame
-                   sourceSlice:0
-                   sourceLevel:0
-                  sourceOrigin:MTLOriginMake(x, y, 0)
-                    sourceSize:MTLSizeMake(1, 1, 1)
-                      toBuffer:buf
-             destinationOffset:0
-        destinationBytesPerRow:4
-      destinationBytesPerImage:4];
-  [blit endEncoding];
-  [cb commit];
-  [cb waitUntilCompleted];
-  const uint8_t* p = static_cast<const uint8_t*>(buf.contents);
-  bool bgra = frame.pixelFormat == MTLPixelFormatBGRA8Unorm;
-  out_rgba[0] = p[bgra ? 2 : 0];
-  out_rgba[1] = p[1];
-  out_rgba[2] = p[bgra ? 0 : 2];
-  out_rgba[3] = p[3];
-  return true;
+  SyphonOpenGLImage* frame = [client newFrameImage];
+  if (!frame) return false;
+  int w = (int)frame.textureSize.width;
+  int h = (int)frame.textureSize.height;
+  if (x < 0 || y < 0 || x >= w || y >= h) return false;
+
+  CGLSetCurrentContext(context);
+  GLuint fbo = 0;
+  glGenFramebuffersEXT(1, &fbo);
+  glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo);
+  glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
+                            GL_TEXTURE_RECTANGLE_EXT, frame.textureName, 0);
+  // GL rows run bottom-up: image row y is GL row h - 1 - y.
+  glReadPixels(x, h - 1 - y, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, out_rgba);
+  bool ok = glGetError() == GL_NO_ERROR;
+  glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+  glDeleteFramebuffersEXT(1, &fbo);
+  CGLSetCurrentContext(nullptr);
+  return ok;
 }
 
 }  // namespace ikvj

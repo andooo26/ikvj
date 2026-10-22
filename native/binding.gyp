@@ -10,6 +10,8 @@
       "conditions": [
         ["OS=='mac'", {
           "sources": ["src/engine_metal.mm"],
+          # OpenGL is only for the receive probe (a Syphon client as VDMX sees it).
+          "defines": ["GL_SILENCE_DEPRECATION"],
           "xcode_settings": {
             "GCC_ENABLE_CPP_EXCEPTIONS": "YES",
             "CLANG_CXX_LANGUAGE_STANDARD": "c++17",
@@ -29,7 +31,8 @@
             "libraries": [
               "-framework Foundation",
               "-framework Metal",
-              "-framework IOSurface"
+              "-framework IOSurface",
+              "-framework OpenGL"
             ]
           }
         }],
