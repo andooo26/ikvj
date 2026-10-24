@@ -4,6 +4,7 @@
 
 import { BrowserWindow, screen, sharedTexture } from 'electron';
 import type { AppState, DisplayInfo } from '../shared/state';
+import { diag, projectorDiag } from './diag';
 import type { Pipeline } from './pipeline';
 import { loadRendererPage, preloadPath } from './renderer-page';
 import type { Store } from './store';
@@ -26,6 +27,9 @@ export class Projector {
   private win: BrowserWindow | null = null;
   private winDisplay: number | null = null;
   private inFlight = false;
+  private lastSend = 0;
+  /** --ikvj-proj=reuse: one import kept for as long as the handle stays the same. */
+  private reused: { key: string; imported: Electron.SharedTextureImported } | null = null;
   private frames = 0;
   private fps = 0;
   private readonly disposers: (() => void)[] = [];
@@ -93,11 +97,12 @@ export class Projector {
 
   private openOn(display: Electron.Display): void {
     const b = display.bounds;
+    const windowed = diag.projectorWindowed;
     const win = new BrowserWindow({
       x: b.x,
       y: b.y,
-      width: b.width,
-      height: b.height,
+      width: windowed ? Math.min(1280, b.width) : b.width,
+      height: windowed ? Math.min(720, b.height) : b.height,
       frame: false,
       show: false,
       backgroundColor: '#000000',
@@ -117,6 +122,10 @@ export class Projector {
 
     win.once('ready-to-show', () => {
       win.show();
+      if (windowed) {
+        win.focus();
+        return;
+      }
       // macOS "simple" fullscreen covers the menu bar without a new Space, so
       // there is no slide animation and the window stays on the projector.
       if (process.platform === 'darwin') win.setSimpleFullScreen(true);
@@ -145,33 +154,64 @@ export class Projector {
     this.win = null;
     this.winDisplay = null;
     if (win && !win.isDestroyed()) win.destroy();
+    this.reused?.imported.release();
+    this.reused = null;
   }
 
   private sendFrame(): void {
     const win = this.win;
-    if (!win || win.isDestroyed() || this.inFlight || win.webContents.isLoading()) return;
-    const tex = this.pipeline.outputTexture(this.store.get().projector.target);
-    if (!tex) return;
-    let imported: Electron.SharedTextureImported;
-    try {
-      imported = sharedTexture.importSharedTexture({
-        textureInfo: {
-          pixelFormat: 'bgra',
-          codedSize: { width: tex.width, height: tex.height },
-          visibleRect: { x: 0, y: 0, width: tex.width, height: tex.height },
-          handle: process.platform === 'darwin' ? { ioSurface: tex.handle } : { ntHandle: tex.handle },
-        },
-      });
-    } catch {
+    if (!win || win.isDestroyed() || win.webContents.isLoading()) return;
+    const mode = diag.projectorMode;
+    if (mode === 'noframes') return;
+    if (this.inFlight) {
+      projectorDiag.busy++;
       return;
     }
+    const now = performance.now();
+    if (mode === '30fps' && now - this.lastSend < 1000 / 30 - 2) return;
+    const tex = this.pipeline.outputTexture(this.store.get().projector.target);
+    if (!tex) return;
+    const reuse = mode === 'reuse';
+    const key = `${tex.handle.toString('hex')}:${tex.width}x${tex.height}`;
+    let imported: Electron.SharedTextureImported;
+    if (reuse && this.reused?.key === key) {
+      imported = this.reused.imported;
+    } else {
+      const t0 = performance.now();
+      try {
+        imported = sharedTexture.importSharedTexture({
+          textureInfo: {
+            pixelFormat: 'bgra',
+            codedSize: { width: tex.width, height: tex.height },
+            visibleRect: { x: 0, y: 0, width: tex.width, height: tex.height },
+            handle: process.platform === 'darwin' ? { ioSurface: tex.handle } : { ntHandle: tex.handle },
+          },
+        });
+      } catch (err) {
+        projectorDiag.errors++;
+        projectorDiag.lastError = String(err);
+        return;
+      }
+      projectorDiag.importMs.add(performance.now() - t0);
+      if (reuse) {
+        this.reused?.imported.release();
+        this.reused = { key, imported };
+      }
+    }
     this.inFlight = true;
+    this.lastSend = now;
     sharedTexture
       .sendSharedTexture({ frame: win.webContents.mainFrame, importedSharedTexture: imported }, CANVAS_ID)
-      .then(() => this.frames++)
-      .catch(() => {})
+      .then(() => {
+        this.frames++;
+        projectorDiag.sendMs.add(performance.now() - now);
+      })
+      .catch((err) => {
+        projectorDiag.errors++;
+        projectorDiag.lastError = String(err);
+      })
       .finally(() => {
-        imported.release();
+        if (!reuse) imported.release();
         this.inFlight = false;
       });
   }

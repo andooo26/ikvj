@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import { parseCommand, parsePointerInput } from '../shared/commands';
 import { IPC, type DispatchResult } from '../shared/ipc';
 import { GEN_SOURCE_IDS, YOUTUBE_SOURCE_IDS, initialState, type Stats, type YouTubeSourceId } from '../shared/state';
+import { diag, startDiagLog } from './diag';
 import { getLoginState, installGoogleHeaderFilter, logout, openGoogleLogin } from './auth/google';
 import { Pipeline, type PipelineStats } from './pipeline';
 import { Projector, listDisplays } from './projector';
@@ -86,10 +87,26 @@ ipcMain.handle(IPC.getLogin, () => getLoginState());
 
 app.whenReady().then(() => {
   installGoogleHeaderFilter();
+  let lastStats: Stats | null = null;
   pipeline = new Pipeline(store, (p: PipelineStats) => {
     const stats: Stats = { ...p, displays: listDisplays(), projectorFps: projector?.framesPerSecond() ?? 0 };
+    lastStats = stats;
     send(IPC.stats, stats);
   });
+  if (diag.enabled) {
+    startDiagLog(() => {
+      const { settings, projector: proj } = store.get();
+      return {
+        settings,
+        projector: proj,
+        sourceFps: lastStats?.sourceFps,
+        mixFps: lastStats?.mixFps,
+        projectorFps: lastStats?.projectorFps,
+        engine: lastStats?.engine,
+        error: lastStats?.error,
+      };
+    });
+  }
   pipeline.start();
   projector = new Projector(store, pipeline);
   projector.start();
