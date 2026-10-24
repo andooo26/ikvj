@@ -2,6 +2,10 @@ name: release
 
 # Push a tag like v0.1.0 (matching package.json's version) to build both
 # platforms and attach the installers to a draft GitHub Release.
+#
+# The platform jobs only build; one final job creates (or reuses) the draft and
+# uploads everything, so both installers always land on the same Release and a
+# missing file fails the run instead of passing silently.
 on:
   push:
     tags: ['v*']
@@ -11,15 +15,19 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  build:
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: macos-14 # Apple Silicon -> dmg / zip (arm64)
             platform: --mac
+            files: |
+              dist/*.dmg
+              dist/*.zip
           - os: windows-latest # x64 -> NSIS installer
             platform: --win
+            files: dist/*.exe
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
@@ -33,7 +41,29 @@ jobs:
       - name: Native self-test
         run: npm run test:native
       - run: npm test
-      - name: Build and publish
-        run: npx electron-vite build && npx electron-builder ${{ matrix.platform }} --publish always
+      - name: Package
+        run: npm run dist -- ${{ matrix.platform }} --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.os }}
+          path: ${{ matrix.files }}
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/') # a manual run only builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: installers
+          merge-multiple: true
+      - name: Attach to the draft release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          ls -l installers
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --draft --title "$TAG" --notes ""
+          gh release upload "$TAG" installers/* --clobber
